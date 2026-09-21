@@ -1,0 +1,283 @@
+@import "tailwindcss";
+@plugin "tailwindcss-animate";
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  
+  --color-sidebar: var(--sidebar);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  
+  --color-border: var(--border);
+  --color-input: var(--input);
+  
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  
+  --color-teal: var(--teal);
+  --color-teal-foreground: var(--teal-foreground);
+  
+  --radius-xl: 24px;
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+  
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  /* Default: LIGHT MODE (Professional Enterprise CCTV Theme) */
+  :root {
+    --background: #F8FAFC;
+    --foreground: #0F172A;
+    --sidebar: #FFFFFF;
+    --card: #FFFFFF;
+    --card-foreground: #0F172A;
+    --popover: #FFFFFF;
+    --popover-foreground: #0F172A;
+    --primary: #2563EB;
+    --primary-foreground: #FFFFFF;
+    --secondary: #F1F5F9;
+    --secondary-foreground: #475569;
+    --muted: #F1F5F9;
+    --muted-foreground: #64748B;
+    --accent: #7C3AED;
+    --accent-foreground: #FFFFFF;
+    --teal: #0D9488;
+    --teal-foreground: #FFFFFF;
+    --success: #16A34A;
+    --danger: #DC2626;
+    --warning: #D97706;
+    --border: #E2E8F0;
+    --input: #CBD5E1;
+    --ring: #2563EB;
+    
+    /* Theme Tokens */
+    --bg-primary: #F8FAFC;
+    --bg-white: #FFFFFF;
+    --bg-alt: #F1F5F9;
+    --bg-card: #FFFFFF;
+    --bg-sidebar: #FFFFFF;
+    --bg-header: #FFFFFF;
+    --bg-accent-subtle: #EFF6FF;
+    --bg-teal-subtle: #F0FDFA;
+    --bg-purple-subtle: #F5F3FF;
+    --bg-success-subtle: #F0FDF4;
+    --bg-warning-subtle: #FFFBEB;
+    --bg-danger-subtle: #FEF2F2;
+
+    --text-heading: #0F172A;
+    --text-primary: #0F172A;
+    --text-body: #475569;
+    --text-secondary: #64748B;
+    --text-muted: #94A3B8;
+
+    --brand-primary: #2563EB;
+    --brand-teal: #0D9488;
+    --brand-purple: #7C3AED;
+
+    --glass-bg: rgba(255, 255, 255, 0.88);
+    --glass-pro-bg: rgba(255, 255, 255, 0.95);
+    --glass-border: rgba(226, 232, 240, 0.9);
+    --glass-shadow: rgba(15, 23, 42, 0.04);
+    --gradient-from: #2563EB;
+    --gradient-to: #0D9488;
+    --glass-pro-shadow: rgba(15, 23, 42, 0.08);
+    --body-grad-1: rgba(37, 99, 235, 0.04);
+    --body-grad-2: rgba(13, 148, 136, 0.03);
+  }
+
+  /* DARK MODE */
+  .dark {
+    --background: #050505;
+    --foreground: #F8F9FA;
+    --sidebar: #0A0A0A;
+    --card: #0F0F11;
+    --card-foreground: #F8F9FA;
+    --popover: #0F0F11;
+    --popover-foreground: #F8F9FA;
+    --primary: #0070F3;
+    --primary-foreground: #FFFFFF;
+    --secondary: #1F2937;
+    --secondary-foreground: #F9FAFB;
+    --muted: #171717;
+    --muted-foreground: #A1A1AA;
+    --accent: #8B5CF6;
+    --accent-foreground: #FFFFFF;
+    --success: #10B981;
+    --danger: #EF4444;
+    --warning: #F59E0B;
+    --border: #1E1E24;
+    --input: #1E1E24;
+    --ring: #0070F3;
+    
+    --glass-bg: rgba(10, 10, 10, 0.7);
+    --glass-pro-bg: rgba(5, 5, 5, 0.6);
+    --glass-border: rgba(255, 255, 255, 0.05);
+    --glass-shadow: rgba(0, 0, 0, 0.36);
+    --glass-pro-shadow: rgba(0, 0, 0, 0.5);
+  --gradient-from: #ff00ff;
+  --gradient-to: #00ffff;
+    --body-grad-1: rgba(0, 112, 243, 0.08);
+    --body-grad-2: rgba(139, 92, 246, 0.08);
+  }
+
+  /* COLORFUL MODE (Windows 11 Bloom Style) */
+  .theme-colorful {
+    --background: #EBF4FA;
+    --foreground: #0B2545;
+    --sidebar: #EBF4FA;
+    --card: rgba(255, 255, 255, 0.85);
+    --card-foreground: #0B2545;
+    --popover: rgba(255, 255, 255, 0.85);
+    --popover-foreground: #0B2545;
+    --primary: #00A6FB;
+    --primary-foreground: #FFFFFF;
+    --secondary: rgba(255, 255, 255, 0.5);
+    --secondary-foreground: #18181B;
+    --muted: rgba(255, 255, 255, 0.4);
+    --muted-foreground: #475569;
+    --accent: #E114A5;
+    --accent-foreground: #FFFFFF;
+    --success: #10B981;
+    --danger: #F43F5E;
+    --warning: #F59E0B;
+    --border: rgba(255, 255, 255, 0.5);
+    --input: rgba(255, 255, 255, 0.5);
+    --ring: #00A6FB;
+    
+    --glass-bg: rgba(255, 255, 255, 0.4);
+    --glass-pro-bg: rgba(255, 255, 255, 0.25);
+    --glass-border: rgba(255, 255, 255, 0.6);
+    --glass-shadow: rgba(0, 166, 251, 0.15);
+    --glass-pro-shadow: rgba(225, 20, 165, 0.15);
+    --body-grad-1: rgba(0, 166, 251, 0.4);
+    --body-grad-2: rgba(225, 20, 165, 0.3);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased selection:bg-primary/30 selection:text-primary-foreground;
+    background-image: 
+      radial-gradient(circle at 15% 50%, var(--body-grad-1), transparent 35%),
+      radial-gradient(circle at 85% 30%, var(--body-grad-2), transparent 35%);
+    background-attachment: fixed;
+  }
+
+  
+  /* 
+   ======================================================================
+   GLASSMORPHISM & PREMIUM UTILITIES (Aceternity / Magic UI style)
+   ======================================================================
+  */
+  
+  .glass {
+    background-color: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 8px 32px 0 var(--glass-shadow);
+    @apply backdrop-blur-xl;
+  }
+  
+  .glass-pro {
+    background-color: var(--glass-pro-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: 
+      0 0 0 1px var(--glass-border) inset,
+      0 20px 40px var(--glass-pro-shadow);
+    @apply backdrop-blur-2xl;
+  }
+
+  .glass-panel {
+    background-color: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 8px 32px 0 var(--glass-shadow);
+    @apply backdrop-blur-3xl;
+  }
+  
+  /* Neon Glow Utilities for accents and critical paths */
+  .glow-primary {
+    box-shadow: 0 0 20px rgba(0, 112, 243, 0.4);
+  }
+  
+  .glow-accent {
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
+  }
+
+  .glow-danger {
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+  }
+  
+  /* Text gradients */
+  .text-gradient {
+  @apply bg-clip-text text-transparent;
+  background-image: linear-gradient(to right, var(--gradient-from), var(--gradient-to));
+}
+
+  /* 
+   ======================================================================
+   MICRO ANIMATIONS & INTERACTIONS
+   ======================================================================
+  */
+  .hover-lift {
+    @apply transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10 hover:border-foreground/10;
+  }
+
+  .animated-border {
+    position: relative;
+    background: var(--card);
+    background-clip: padding-box;
+    border: 1px solid transparent;
+  }
+
+  .animated-border::before {
+    content: "";
+    position: absolute;
+    top: 0; right: 0; bottom: 0; left: 0;
+    z-index: -1;
+    margin: -1px;
+    border-radius: inherit;
+    background: linear-gradient(to right, rgba(0, 112, 243, 0.5), rgba(139, 92, 246, 0.5));
+    opacity: 0;
+    transition: opacity 0.3s ease-out;
+  }
+
+  .animated-border:hover::before {
+    opacity: 1;
+  }
+  
+  /* 
+   ======================================================================
+   SMOOTH SCROLLBAR
+   ======================================================================
+  */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/30 rounded-full transition-colors;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/50;
+  }
+}

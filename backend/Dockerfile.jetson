@@ -1,0 +1,13 @@
+FROM nvcr.io/nvidia/l4t-pytorch:r36.2.0-pth2.1-py3
+
+WORKDIR /app
+
+# Install python dependencies for inference (redis, ultralytics)
+COPY backend/requirements-inference.txt .
+RUN pip3 install --no-cache-dir -r requirements-inference.txt
+
+# Copy the inference service and the models
+COPY backend /app/backend
+
+# Run the inference service
+CMD ["python3", "backend/inference_service.py"]

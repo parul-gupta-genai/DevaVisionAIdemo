@@ -1,0 +1,39 @@
+ocr:
+  provider: "fast_plate"          # plate-specialized ONNX OCR (fast-plate-ocr)
+  fast_plate_model: "cct-s-v1-global-model"
+  fallback_provider: "easyocr"
+  local_model_path: "models/awiros"
+  download_if_missing: true
+  use_gpu: false                  # CUDA is unusable in-process: cuDNN cannot init
+                                  # alongside DeepStream's TensorRT context
+                                  # (CUDNN_STATUS_NOT_INITIALIZED). GPU OCR needs
+                                  # an nvinfer SGIE, not onnxruntime.
+  confidence_threshold: 0.55
+
+plate_detector:
+  provider: "indian_yolo"
+  model_path: "license_plate_yolov11n.pt"   # resolved against backend/detection/
+  confidence_threshold: 0.35
+
+validation:
+  smart_repair_enabled: true
+  repair_confidence_threshold: 0.85
+  strict: true                    # reject strings that match no Indian format
+  format_strategies:
+    - "private"
+    - "commercial"
+    - "ev"
+    - "bh_series"
+    - "legacy_no_series"
+    - "diplomatic"
+    - "military"
+
+fusion:
+  min_observations: 2             # need 2 agreeing frames before reporting
+  track_timeout_seconds: 2.5
+  weighted_voting: true
+
+enhancement:
+  clahe_clip_limit: 2.0
+  denoise_h: 7                    # 30 was destructive; smeared characters
+  quality_threshold: 0.75

@@ -1,0 +1,18 @@
+from enum import Enum
+
+class ANPREventType(str, Enum):
+    PLATE_DETECTED = "PLATE_DETECTED"
+    NEW_PLATE = "NEW_PLATE"
+    WHITELIST_MATCH = "WHITELIST_MATCH"
+    BLACKLIST_MATCH = "BLACKLIST_MATCH"
+    LOW_CONFIDENCE = "LOW_CONFIDENCE"
+    OCR_FAILED = "OCR_FAILED"
+    DUPLICATE_PLATE = "DUPLICATE_PLATE"
+    TRACK_STARTED = "TRACK_STARTED"
+    TRACK_ENDED = "TRACK_ENDED"
+    # Gate-wise outcomes (SOW 2.6). A pass whose direction could not be
+    # determined is still recorded, as VEHICLE_PASS.
+    VEHICLE_ENTRY = "VEHICLE_ENTRY"
+    VEHICLE_EXIT = "VEHICLE_EXIT"
+    VEHICLE_PASS = "VEHICLE_PASS"
+    ACCESS_DENIED = "ACCESS_DENIED"

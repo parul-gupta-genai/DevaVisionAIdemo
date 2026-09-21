@@ -1,0 +1,17 @@
+.venv/
+node_modules/
+.DS_Store
+.env
+.secret_key
+*.mp4
+*.avi
+*.mov
+snapshots/
+*.log
+__pycache__/
+.pytest_cache/
+*.pt
+*.onnx
+*.engine
+*.joblib
+devavision.db

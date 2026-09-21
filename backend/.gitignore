@@ -1,0 +1,12 @@
+.venv/
+node_modules/
+.DS_Store
+.env
+*.mp4
+snapshots/
+*.log
+*.txt
+__pycache__/
+*.mov
+*.task
+models/

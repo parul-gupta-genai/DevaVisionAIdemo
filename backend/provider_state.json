@@ -1,0 +1,117 @@
+{
+  "customers": [
+    {
+      "id": "cust_101",
+      "companyName": "Reliance Industrial Hub",
+      "clientName": "Vikram Patel",
+      "email": "v.patel@ril-hub.in",
+      "phone": "+91 98765 43210",
+      "siteLocation": "Hazira Manufacturing Complex, Gujarat",
+      "maxCameras": 16,
+      "activeCameras": 8,
+      "licenseKey": "DEVA-CORP-7749-X9K1",
+      "planName": "Enterprise Comprehensive",
+      "duration": "1 Year",
+      "startDate": "2026-09-09",
+      "expiryDate": "2027-09-09",
+      "status": "Active",
+      "enabledServices": [
+        "ppe_detection",
+        "fire_smoke",
+        "anpr_vehicles",
+        "face_attendance",
+        "visitor_vms",
+        "restricted_zones",
+        "voice_assistant"
+      ],
+      "monthlyFee": 14490,
+      "createdAt": "2026-09-09 21:25:42"
+    },
+    {
+      "id": "cust_102",
+      "companyName": "Apex Logistics & Warehousing",
+      "clientName": "Sunil Sharma",
+      "email": "sunil.s@apexlogistics.com",
+      "phone": "+91 98111 22334",
+      "siteLocation": "Bhiwandi Hub 4, Mumbai",
+      "maxCameras": 8,
+      "activeCameras": 4,
+      "licenseKey": "DEVA-PRO-3810-M2L4",
+      "planName": "Logistics & Perimeter",
+      "duration": "3 Months",
+      "startDate": "2026-09-09",
+      "expiryDate": "2026-12-08",
+      "status": "Active",
+      "enabledServices": [
+        "anpr_vehicles",
+        "restricted_zones",
+        "fire_smoke",
+        "voice_assistant"
+      ],
+      "monthlyFee": 7996,
+      "createdAt": "2026-09-09 21:25:42"
+    },
+    {
+      "id": "cust_103",
+      "companyName": "Grand Horizon Tech Park",
+      "clientName": "Pooja Reddy",
+      "email": "admin@horizonpark.co.in",
+      "phone": "+91 99000 88776",
+      "siteLocation": "Electronic City Phase 1, Bengaluru",
+      "maxCameras": 24,
+      "activeCameras": 12,
+      "licenseKey": "DEVA-BIZ-9104-Z8P3",
+      "planName": "Commercial Standard",
+      "duration": "1 Month",
+      "startDate": "2026-08-25",
+      "expiryDate": "2026-09-24",
+      "status": "Expiring Soon",
+      "enabledServices": [
+        "face_attendance",
+        "visitor_vms",
+        "ppe_detection",
+        "voice_assistant"
+      ],
+      "monthlyFee": 6496,
+      "createdAt": "2026-09-09 21:25:42"
+    }
+  ],
+  "payments": [
+    {
+      "id": "INV-2026-0891",
+      "customerId": "cust_101",
+      "companyName": "Reliance Industrial Hub",
+      "amount": 173880,
+      "plan": "Enterprise Comprehensive (1 Year)",
+      "paymentMethod": "UPI / NetBanking",
+      "transactionId": "TXN_UPI_9824109283",
+      "status": "Paid",
+      "date": "2026-09-09 21:25",
+      "expiryAfterPayment": "2027-09-09"
+    },
+    {
+      "id": "INV-2026-0874",
+      "customerId": "cust_102",
+      "companyName": "Apex Logistics & Warehousing",
+      "amount": 23988,
+      "plan": "Logistics & Perimeter (3 Months)",
+      "paymentMethod": "Corporate Credit Card",
+      "transactionId": "TXN_CARD_44910283",
+      "status": "Paid",
+      "date": "2026-09-04 21:25",
+      "expiryAfterPayment": "2026-12-08"
+    },
+    {
+      "id": "INV-2026-0850",
+      "customerId": "cust_103",
+      "companyName": "Grand Horizon Tech Park",
+      "amount": 6496,
+      "plan": "Commercial Standard (1 Month)",
+      "paymentMethod": "Razorpay Direct",
+      "transactionId": "TXN_RZP_1102938",
+      "status": "Paid",
+      "date": "2026-08-25 21:25",
+      "expiryAfterPayment": "2026-09-24"
+    }
+  ]
+}
