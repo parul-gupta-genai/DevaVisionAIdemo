@@ -64,6 +64,16 @@ def settings(): return {}
 @app.get("/api/system/info")
 def system_info(): return {"version": "1.0.0", "status": "running"}
 
-dist_path = "/kaggle/working/DevaVisionAIdemo/frontend/dist"
-if os.path.exists(dist_path):
-    app.mount("/", StaticFiles(directory=dist_path, html=True), name="static")
+dist_candidates = [
+    os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"),
+    os.path.join(os.path.dirname(__file__), "frontend", "dist"),
+    "/kaggle/working/DevaVisionAIdemo/frontend/dist",
+    os.path.abspath("frontend/dist"),
+    os.path.abspath("../frontend/dist")
+]
+
+for candidate in dist_candidates:
+    if os.path.exists(candidate) and os.path.isdir(candidate):
+        app.mount("/", StaticFiles(directory=candidate, html=True), name="static")
+        print(f"Mounted frontend dist from: {candidate}")
+        break
