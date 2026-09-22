@@ -110,7 +110,21 @@ def main():
     images = find_all_files(search_dirs, [".png", ".jpg", ".jpeg", ".PNG", ".JPG", ".JPEG"])
     annotations = find_all_files(search_dirs, [".xml", ".XML"])
     ids = sorted(set(images) & set(annotations))
-    print(f"Matched image+annotation pairs: {len(ids)}")
+    print(f"Matched image+annotation pairs initially: {len(ids)}")
+
+    if not ids:
+        try:
+            import kagglehub
+            print("\nNo local dataset found. Auto-downloading Hard-Hat dataset via kagglehub...")
+            kh_path = kagglehub.dataset_download("andrewmvd/hard-hat-detection")
+            print(f"Downloaded dataset to {kh_path}")
+            search_dirs.append(Path(kh_path))
+            images = find_all_files(search_dirs, [".png", ".jpg", ".jpeg", ".PNG", ".JPG", ".JPEG"])
+            annotations = find_all_files(search_dirs, [".xml", ".XML"])
+            ids = sorted(set(images) & set(annotations))
+            print(f"Matched image+annotation pairs after download: {len(ids)}")
+        except Exception as e:
+            print(f"kagglehub auto-download failed: {e}")
 
     if not ids:
         print("\nWARNING: No image+annotation pairs found!")
