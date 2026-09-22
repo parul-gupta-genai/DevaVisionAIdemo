@@ -1,6 +1,6 @@
 """
 DevaVisionAI High-Accuracy Video AI Tester.
-Powered by benchmark-trained YOLO models for Fire, Smoke, Fight, ANPR, and Objects.
+Distinct real-time Fire & Smoke detection with separate tags and colors.
 """
 
 import sys
@@ -21,12 +21,12 @@ def draw_custom_box(img, box, label, score, color=(0, 0, 255)):
     
     cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
     
-    text = f"{label.upper()} {score:.0%}"
+    text = f"{label} {score:.0%}"
     (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 2)
     cv2.rectangle(img, (x1, max(0, y1 - 24)), (x1 + tw + 8, max(0, y1)), color, -1)
     cv2.putText(img, text, (x1 + 4, max(16, y1 - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
 
-def run_video_ai(video_source, task="fire", output_path=None, show_window=True, conf_threshold=0.25):
+def run_video_ai(video_source, task="fire", output_path=None, show_window=True, conf_threshold=0.20):
     from ultralytics import YOLO
     
     model_paths = {
@@ -43,10 +43,10 @@ def run_video_ai(video_source, task="fire", output_path=None, show_window=True, 
         selected_model_path = backend_dir / "yolov8n.pt"
 
     print(f"\n=======================================================")
-    print(f"🚀 DevaVisionAI High-Accuracy Engine [{task.upper()}]")
+    print(f"🚀 DevaVisionAI Smart Detection [{task.upper()}]")
     print(f"📦 Model: {selected_model_path.name}")
-    print(f"📹 Video Source: {video_source}")
-    print(f"🎯 Confidence Threshold: {conf_threshold:.2f}")
+    print(f"📹 Video: {video_source}")
+    print(f"🎯 Threshold: {conf_threshold:.2f}")
     print(f"=======================================================\n")
 
     model = YOLO(str(selected_model_path))
@@ -82,6 +82,8 @@ def run_video_ai(video_source, task="fire", output_path=None, show_window=True, 
             frame_idx += 1
             display_frame = frame.copy()
             detected_threats = []
+            has_fire = False
+            has_smoke = False
 
             # YOLO AI Inference
             results = model.predict(frame, conf=conf_threshold, verbose=False)
@@ -93,22 +95,20 @@ def run_video_ai(video_source, task="fire", output_path=None, show_window=True, 
                     cls_name = model.names.get(cls_id, str(cls_id)).lower()
                     xyxy = boxes.xyxy[i].cpu().numpy()
 
-                    # Filter invalid/background classes
-                    if cls_name in ["no-fire", "no fire", "nofire", "light", "background"]:
-                        continue
-
-                    # Color categorization
+                    # Class Check
                     if "fire" in cls_name or "flame" in cls_name:
-                        color = (0, 0, 255) # Red
+                        color = (0, 0, 255) # Bright Red
                         tag = "FIRE"
+                        has_fire = True
                     elif "smoke" in cls_name:
-                        color = (0, 165, 255) # Orange
+                        color = (0, 165, 255) # Bright Orange
                         tag = "SMOKE"
+                        has_smoke = True
                     elif "fight" in cls_name:
-                        color = (255, 0, 128) # Magenta
+                        color = (255, 0, 128)
                         tag = "FIGHT"
                     elif "plate" in cls_name:
-                        color = (0, 255, 0) # Green
+                        color = (0, 255, 0)
                         tag = "LICENSE PLATE"
                     else:
                         color = (255, 200, 0)
@@ -123,13 +123,24 @@ def run_video_ai(video_source, task="fire", output_path=None, show_window=True, 
             hud = f"DevaVisionAI [{task.upper()}] | Frame: {frame_idx} | FPS: {fps_live:.1f}"
             cv2.putText(display_frame, hud, (18, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
-            # Red Alert Banner on Detection
+            # Contextual Alert Banner
             if detected_threats:
                 total_threat_frames += 1
-                top_threat = max(detected_threats, key=lambda x: x[1])
-                alert_text = f"ALERT: {top_threat[0]} ({top_threat[1]:.0%})"
-                cv2.rectangle(display_frame, (10, 56), (420, 94), (0, 0, 220), -1)
-                cv2.putText(display_frame, f"⚠️ {alert_text}", (18, 83), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                if has_fire and has_smoke:
+                    alert_title = "FIRE & SMOKE DETECTED"
+                    banner_color = (0, 0, 220)
+                elif has_fire:
+                    alert_title = "FIRE DETECTED"
+                    banner_color = (0, 0, 220)
+                elif has_smoke:
+                    alert_title = "SMOKE DETECTED"
+                    banner_color = (0, 140, 255)
+                else:
+                    alert_title = f"{detected_threats[0][0]} DETECTED"
+                    banner_color = (0, 0, 220)
+
+                cv2.rectangle(display_frame, (10, 56), (420, 94), banner_color, -1)
+                cv2.putText(display_frame, f"ALERT: {alert_title}", (18, 83), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
             if out_writer:
                 out_writer.write(display_frame)
@@ -161,7 +172,7 @@ if __name__ == "__main__":
     parser.add_argument("--task", type=str, default="fire", choices=["fire", "smoke", "fight", "anpr", "yolo", "yolo11"], help="Detection Task")
     parser.add_argument("--output", type=str, default=None, help="Save output video path")
     parser.add_argument("--no-show", action="store_true", help="Run without UI window")
-    parser.add_argument("--conf", type=float, default=0.25, help="Confidence threshold (default 0.25)")
+    parser.add_argument("--conf", type=float, default=0.20, help="Confidence threshold (default 0.20)")
 
     args = parser.parse_args()
     run_video_ai(
