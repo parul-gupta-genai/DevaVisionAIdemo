@@ -124,10 +124,10 @@ def main():
 
     if not valid_ids:
         datasets_to_try = [
-            "farzadnejad/vehicle-detection-dataset",
-            "nithin1999/vehicle-detection-dataset",
-            "steve108/vehicles-dataset",
-            "alxmamaev/vehicles-open-images"
+            "pkdarabi/vehicle-detection-dataset",
+            "vitaliypolyakov/vehicle-detection",
+            "ahmetfurkandemir/vehicle-detection-dataset",
+            "vijaykumar22/vehicle-detection-dataset"
         ]
         import kagglehub
         for ds in datasets_to_try:
