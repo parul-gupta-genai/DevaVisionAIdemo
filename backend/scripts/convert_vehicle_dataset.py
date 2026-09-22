@@ -123,19 +123,39 @@ def main():
     print(f"Matched valid vehicle image+annotation pairs initially: {len(valid_ids)}")
 
     if not valid_ids:
-        try:
-            import kagglehub
-            print("\nNo local vehicle dataset found. Auto-downloading Vehicle dataset via kagglehub...")
-            kh_path = kagglehub.dataset_download("salisulley/vehicle-detection")
-            print(f"Downloaded vehicle dataset to {kh_path}")
-            search_dirs.append(Path(kh_path))
-            images = find_vehicle_images(search_dirs)
-            annotations = find_annotations(search_dirs)
-            candidate_ids = sorted(set(images.keys()) & set(annotations.keys()))
-            valid_ids = [stem for stem in candidate_ids if convert(annotations[stem])]
-            print(f"Matched valid vehicle pairs after download: {len(valid_ids)}")
-        except Exception as e:
-            print(f"kagglehub vehicle auto-download failed: {e}")
+        datasets_to_try = [
+            "farzadnejad/vehicle-detection-dataset",
+            "nithin1999/vehicle-detection-dataset",
+            "steve108/vehicles-dataset",
+            "alxmamaev/vehicles-open-images"
+        ]
+        import kagglehub
+        for ds in datasets_to_try:
+            try:
+                print(f"\nTrying to auto-download Vehicle dataset '{ds}' via kagglehub...")
+                kh_path = Path(kagglehub.dataset_download(ds))
+                print(f"Downloaded vehicle dataset to {kh_path}")
+                search_dirs.append(kh_path)
+
+                # Check if downloaded dataset already has a valid YOLO data.yaml or train/val folders
+                yaml_files = list(kh_path.rglob("data.yaml")) + list(kh_path.rglob("*.yaml"))
+                if yaml_files:
+                    print(f"Found existing YOLO data.yaml at {yaml_files[0]}")
+                    # Link or copy data.yaml to out_dir
+                    out_dir.mkdir(parents=True, exist_ok=True)
+                    shutil.copy(yaml_files[0], out_dir / "data.yaml")
+                    print(f"Successfully configured YOLO dataset at {out_dir}")
+                    return
+
+                images = find_vehicle_images(search_dirs)
+                annotations = find_annotations(search_dirs)
+                candidate_ids = sorted(set(images.keys()) & set(annotations.keys()))
+                valid_ids = [stem for stem in candidate_ids if convert(annotations[stem])]
+                if valid_ids:
+                    print(f"Matched valid vehicle pairs after download: {len(valid_ids)}")
+                    break
+            except Exception as e:
+                print(f"Attempt for '{ds}' failed: {e}")
 
     if not valid_ids:
         print("\nWARNING: No vehicle image+annotation pairs found!")
