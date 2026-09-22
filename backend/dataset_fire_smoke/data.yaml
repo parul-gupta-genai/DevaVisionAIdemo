@@ -1,0 +1,13 @@
+path: .
+train: train/images
+val: valid/images
+test: test/images
+
+nc: 3
+names: ['Fire', 'Person', 'Smoke']
+
+roboflow:
+  workspace: senior-design-project-cavtw
+  project: fire-and-smoke-detection-yolov8
+  version: 1
+  license: CC BY 4.0
