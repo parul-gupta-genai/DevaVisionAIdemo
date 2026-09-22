@@ -57,7 +57,13 @@ def main():
             f"{data_yaml} not found. Run convert_vehicle_dataset.py first."
         )
 
+    import torch
     from ultralytics import YOLO
+
+    device = args.device
+    if device is not None and device != "cpu" and not torch.cuda.is_available():
+        print(f"WARNING: Device '{device}' requested, but CUDA is not available in PyTorch. Auto-falling back to CPU.")
+        device = "cpu"
 
     model = YOLO(args.model)
     kwargs = dict(
@@ -77,8 +83,8 @@ def main():
         fliplr=0.5,
         mosaic=1.0,
     )
-    if args.device is not None:
-        kwargs["device"] = args.device
+    if device is not None:
+        kwargs["device"] = device
 
     results = model.train(**kwargs)
 
