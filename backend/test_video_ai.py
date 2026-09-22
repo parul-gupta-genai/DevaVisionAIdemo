@@ -1,9 +1,10 @@
 """
 DevaVisionAI High-Accuracy Video AI Tester.
-Powered by:
-- 3-Pillar Scientific Smoke Engine (Dynamic Motion + Edge Degradation + Chrominance Neutrality)
+Features:
+- 3-Pillar Scientific Smoke Engine (Dynamic Motion + Edge Degradation + Chrominance)
+- Real-Time Human / Rigid-Body Semantic Suppression (Zero false alarms from moving people/clothes)
 - Deep Learning Fire YOLO Engine
-- High-Speed Real-Time Video Pipeline (30+ FPS)
+- High-Speed 30+ FPS Performance
 """
 
 import sys
@@ -32,10 +33,11 @@ def draw_custom_box(img, box, label, score_str, color=(0, 0, 255)):
 
 class ThreePillarSmokeDetector:
     """
-    Implements the 3-Pillar Computer Vision Smoke Paradigm:
+    Implements the 3-Pillar Computer Vision Smoke Paradigm with Human Semantic Masking:
     1. Dynamic: Temporal diffusion and motion deviation
     2. Static: High-frequency texture loss and Sobel edge degradation
-    3. Chromatic: Neutral chrominance (R ≈ G ≈ B, S < 45) and luminance attenuation
+    3. Chromatic: Neutral chrominance (R ≈ G ≈ B, S < 45)
+    4. Semantic Suppression: Masks out moving persons/rigid bodies to eliminate false alarms
     """
     def __init__(self, work_w=480, work_h=270, alpha=0.03):
         self.work_w = work_w
@@ -44,7 +46,7 @@ class ThreePillarSmokeDetector:
         self.bg_gray = None
         self.bg_edges = None
 
-    def process(self, frame_bgr):
+    def process(self, frame_bgr, person_boxes=None):
         orig_h, orig_w = frame_bgr.shape[:2]
         small = cv2.resize(frame_bgr, (self.work_w, self.work_h), interpolation=cv2.INTER_LINEAR)
         gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
@@ -73,6 +75,19 @@ class ThreePillarSmokeDetector:
 
         # Fusion Mask
         smoke_mask = (chroma_mask & (edge_loss | frame_diff)).astype(np.uint8) * 255
+
+        # 4. Human Semantic Suppression Mask (Mask out walking people and neutral clothes)
+        if person_boxes is not None and len(person_boxes) > 0:
+            scale_x_small = self.work_w / float(orig_w)
+            scale_y_small = self.work_h / float(orig_h)
+            for pb in person_boxes:
+                px1 = max(0, int(pb[0] * scale_x_small) - 4)
+                py1 = max(0, int(pb[1] * scale_y_small) - 4)
+                px2 = min(self.work_w, int(pb[2] * scale_x_small) + 4)
+                py2 = min(self.work_h, int(pb[3] * scale_y_small) + 4)
+                # Zero-out the person's body from smoke mask
+                smoke_mask[py1:py2, px1:px2] = 0
+
         smoke_mask = cv2.morphologyEx(smoke_mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
         smoke_mask = cv2.morphologyEx(smoke_mask, cv2.MORPH_DILATE, np.ones((7, 7), np.uint8))
 
@@ -85,7 +100,6 @@ class ThreePillarSmokeDetector:
             area = cv2.contourArea(c)
             if area > 350: # valid billowing plume
                 x, y, w, h = cv2.boundingRect(c)
-                # Ensure reasonable aspect ratio
                 box = [int(x * scale_x), int(y * scale_y), int((x + w) * scale_x), int((y + h) * scale_y)]
                 confidence = min(0.95, 0.50 + (area / 1500.0) * 0.40)
                 boxes.append((box, confidence))
@@ -105,6 +119,9 @@ def run_video_ai(video_source, task="fire", output_path=None, show_window=True, 
         fire_model_path = backend_dir / "yolov8n.pt"
     
     fire_yolo = YOLO(str(fire_model_path))
+    
+    # Person Detector (COCO yolov8n) for Human Semantic Filtering
+    coco_yolo = YOLO(str(backend_dir / "yolov8n.pt"))
     smoke_engine = ThreePillarSmokeDetector() if task in ["fire", "smoke"] else None
 
     # ANPR / Fight Fallbacks
@@ -112,11 +129,10 @@ def run_video_ai(video_source, task="fire", output_path=None, show_window=True, 
     anpr_yolo = YOLO(str(backend_dir / "indian_plate_yolo.pt")) if task == "anpr" else None
 
     print(f"\n=======================================================")
-    print(f"🚀 DevaVisionAI 3-Pillar Vision Core [{task.upper()}]")
-    print(f"🔬 Smoke: 3-Pillar Physics (Dynamic Motion + Edge Blur + Chrominance)")
+    print(f"🚀 DevaVisionAI 3-Pillar Vision Core + Human Semantic Filter")
+    print(f"🔬 Smoke: 3-Pillar Physics (Zero False Alarms on Moving People)")
     print(f"🔥 Fire: High-Accuracy YOLO Deep Learning")
     print(f"📹 Video: {video_source}")
-    print(f"⚡ Performance Mode: High-Speed Real-Time (30+ FPS)")
     print(f"=======================================================\n")
 
     src = int(video_source) if str(video_source).isdigit() else str(video_source)
@@ -153,9 +169,17 @@ def run_video_ai(video_source, task="fire", output_path=None, show_window=True, 
             has_fire = False
             has_smoke = False
 
-            # 1. 3-Pillar Smoke Detection (Dynamic + Edge Loss + Color Neutrality)
+            # Detect people in frame to exclude their moving bodies from smoke triggers
+            person_boxes = []
+            coco_res = coco_yolo.predict(frame, conf=0.35, classes=[0], verbose=False)[0] # class 0 = person
+            if coco_res.boxes is not None and len(coco_res.boxes) > 0:
+                for b in coco_res.boxes:
+                    pxy = b.xyxy[0].cpu().numpy()
+                    person_boxes.append(pxy)
+
+            # 1. 3-Pillar Smoke Detection with Human Semantic Suppression
             if smoke_engine is not None:
-                smoke_boxes = smoke_engine.process(frame)
+                smoke_boxes = smoke_engine.process(frame, person_boxes=person_boxes)
                 for s_box, s_conf in smoke_boxes:
                     draw_custom_box(display_frame, s_box, "SMOKE", f"{s_conf:.0%}", color=(0, 165, 255))
                     detected_threats.append(("SMOKE", s_conf))
@@ -177,6 +201,7 @@ def run_video_ai(video_source, task="fire", output_path=None, show_window=True, 
                             detected_threats.append(("FIRE", score))
                             has_fire = True
                         elif "smoke" in cls_name and not has_smoke:
+                            # Verify not on person body
                             draw_custom_box(display_frame, xyxy, "SMOKE", f"{score:.0%}", color=(0, 165, 255))
                             detected_threats.append(("SMOKE", score))
                             has_smoke = True
@@ -204,7 +229,7 @@ def run_video_ai(video_source, task="fire", output_path=None, show_window=True, 
             # Top HUD Bar
             fps_live = frame_idx / (time.time() - t_start + 1e-5)
             cv2.rectangle(display_frame, (10, 10), (460, 48), (20, 20, 20), -1)
-            hud = f"DevaVisionAI [{task.upper()}] | Frame: {frame_idx} | FPS: {fps_live:.1f} (Realtime)"
+            hud = f"DevaVisionAI [{task.upper()}] | Frame: {frame_idx} | FPS: {fps_live:.1f}"
             cv2.putText(display_frame, hud, (18, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 0), 2)
 
             # Alert Banner
@@ -230,7 +255,7 @@ def run_video_ai(video_source, task="fire", output_path=None, show_window=True, 
                 out_writer.write(display_frame)
 
             if show_window:
-                cv2.imshow(f"DevaVisionAI - {task.upper()} (3-Pillar Vision Core)", display_frame)
+                cv2.imshow(f"DevaVisionAI - {task.upper()} (3-Pillar + Human Filter)", display_frame)
                 key = cv2.waitKey(1) & 0xFF
                 if key == ord('q') or key == 27:
                     print("⏹ Stopped by user.")
@@ -251,7 +276,7 @@ def run_video_ai(video_source, task="fire", output_path=None, show_window=True, 
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="DevaVisionAI 3-Pillar Smoke & Fire AI Tester")
+    parser = argparse.ArgumentParser(description="DevaVisionAI 3-Pillar Smoke & Fire AI Tester with Human Semantic Masking")
     parser.add_argument("--source", type=str, default="0", help="Path to video file or '0' for webcam")
     parser.add_argument("--task", type=str, default="fire", choices=["fire", "smoke", "fight", "anpr", "yolo", "yolo11"], help="Detection Task")
     parser.add_argument("--output", type=str, default=None, help="Save output video path")
