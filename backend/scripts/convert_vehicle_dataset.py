@@ -7,7 +7,16 @@ import zipfile
 from pathlib import Path
 
 CLASS_NAMES = ["tractor", "truck"]
-CLASS_IDS = {"tractor": 0, "truck": 1}
+CLASS_IDS = {
+    "tractor": 0,
+    "truck": 1,
+    "car": 1,
+    "bus": 1,
+    "vehicle": 1,
+    "van": 1,
+    "heavy-vehicle": 1,
+    "automobile": 1,
+}
 random.seed(42)
 
 
@@ -27,7 +36,7 @@ def find_vehicle_images(search_dirs):
     images = {}
     for search_dir in search_dirs:
         p = Path(search_dir)
-        if not p.exists():
+        if not p.exists() or "helmet_dataset" in str(p).lower() or "hard-hat" in str(p).lower():
             continue
         for ext in ["*.jpg", "*.jpeg", "*.png", "*.JPG", "*.JPEG", "*.PNG"]:
             for f in p.rglob(ext):
@@ -39,7 +48,7 @@ def find_annotations(search_dirs):
     annotations = {}
     for search_dir in search_dirs:
         p = Path(search_dir)
-        if not p.exists():
+        if not p.exists() or "helmet_dataset" in str(p).lower() or "hard-hat" in str(p).lower():
             continue
         for ext in ["*.xml", "*.XML"]:
             for f in p.rglob(ext):
@@ -109,29 +118,32 @@ def main():
 
     images = find_vehicle_images(search_dirs)
     annotations = find_annotations(search_dirs)
-    ids = sorted(set(images.keys()) & set(annotations.keys()))
-    print(f"Matched vehicle image+annotation pairs initially: {len(ids)}")
+    candidate_ids = sorted(set(images.keys()) & set(annotations.keys()))
+    valid_ids = [stem for stem in candidate_ids if convert(annotations[stem])]
+    print(f"Matched valid vehicle image+annotation pairs initially: {len(valid_ids)}")
 
-    if not ids:
+    if not valid_ids:
         try:
             import kagglehub
             print("\nNo local vehicle dataset found. Auto-downloading Vehicle dataset via kagglehub...")
-            kh_path = kagglehub.dataset_download("brsdsk/vehicle-detection-dataset")
-            print(f"Downloaded dataset to {kh_path}")
+            kh_path = kagglehub.dataset_download("salisulley/vehicle-detection")
+            print(f"Downloaded vehicle dataset to {kh_path}")
             search_dirs.append(Path(kh_path))
             images = find_vehicle_images(search_dirs)
             annotations = find_annotations(search_dirs)
-            ids = sorted(set(images.keys()) & set(annotations.keys()))
-            print(f"Matched vehicle pairs after download: {len(ids)}")
+            candidate_ids = sorted(set(images.keys()) & set(annotations.keys()))
+            valid_ids = [stem for stem in candidate_ids if convert(annotations[stem])]
+            print(f"Matched valid vehicle pairs after download: {len(valid_ids)}")
         except Exception as e:
             print(f"kagglehub vehicle auto-download failed: {e}")
 
-    if not ids:
+    if not valid_ids:
         print("\nWARNING: No vehicle image+annotation pairs found!")
         print("Please ensure your raw vehicle dataset (tractor/truck images + XML annotations) is placed in /kaggle/input or raw_training_data.")
         return
 
-    random.shuffle(ids)
+    random.shuffle(valid_ids)
+    ids = valid_ids
     n = len(ids)
     n_train, n_val = int(n * 0.8), int(n * 0.1)
     splits = {"train": ids[:n_train], "val": ids[n_train:n_train + n_val], "test": ids[n_train + n_val:]}

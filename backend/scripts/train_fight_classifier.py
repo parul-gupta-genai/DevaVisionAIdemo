@@ -92,8 +92,58 @@ def sample_frames(video_path: Path, n_frames: int):
     return np.stack(frames[:n_frames])  # (n_frames, 224, 224, 3) uint8
 
 
+def ensure_fight_dataset():
+    if not DATASET_DIR.exists() or not any(DATASET_DIR.rglob("*.mp4")):
+        print(f"Dataset directory {DATASET_DIR} empty or missing.")
+        try:
+            import kagglehub
+            import shutil
+            import random
+            print("Auto-downloading Real Life Violence Situations Dataset via kagglehub...")
+            kh_path = Path(kagglehub.dataset_download("mohamedmustafa/real-life-violence-situations-dataset"))
+            print(f"Downloaded raw videos to {kh_path}")
+
+            v_dir = None
+            nv_dir = None
+            for p in kh_path.rglob("*"):
+                if p.is_dir():
+                    name_lower = p.name.lower()
+                    if "nonviolence" in name_lower or "non_violence" in name_lower or "non-violence" in name_lower:
+                        nv_dir = p
+                    elif "violence" in name_lower and not nv_dir:
+                        v_dir = p
+
+            if v_dir and nv_dir:
+                v_videos = list(v_dir.glob("*.mp4")) + list(v_dir.glob("*.avi"))
+                nv_videos = list(nv_dir.glob("*.mp4")) + list(nv_dir.glob("*.avi"))
+                print(f"Found {len(v_videos)} violence videos and {len(nv_videos)} non-violence videos.")
+
+                random.seed(42)
+                random.shuffle(v_videos)
+                random.shuffle(nv_videos)
+
+                for cls_name, video_list in [("Violence", v_videos), ("NonViolence", nv_videos)]:
+                    n = len(video_list)
+                    n_train = int(n * 0.8)
+                    n_val = int(n * 0.1)
+                    splits = {
+                        "train": video_list[:n_train],
+                        "val": video_list[n_train:n_train + n_val],
+                        "test": video_list[n_train + n_val:]
+                    }
+                    for split, v_items in splits.items():
+                        target_folder = DATASET_DIR / split / cls_name
+                        target_folder.mkdir(parents=True, exist_ok=True)
+                        for vid in v_items:
+                            shutil.copy(vid, target_folder / vid.name)
+                print(f"Successfully auto-created split fight dataset at {DATASET_DIR}")
+        except Exception as e:
+            print(f"kagglehub auto-download for fight dataset failed: {e}")
+
+
 def build_manifest(split: str):
     """List (video_path, label_idx) pairs for a split."""
+    ensure_fight_dataset()
     items = []
     for label_idx, cls in enumerate(CLASSES):
         cls_dir = DATASET_DIR / split / cls
@@ -106,10 +156,7 @@ def build_manifest(split: str):
 
 
 class ClipDataset:
-    """Minimal on-the-fly dataset: reads+samples frames per __getitem__ call.
-    (Not pre-caching to disk — 2000 clips x 16 frames x 224x224x3 would be
-    several GB; sampling per-epoch is slower but keeps disk/RAM usage low.)
-    """
+    """Minimal on-the-fly dataset: reads+samples frames per __getitem__ call."""
 
     def __init__(self, split: str, frames_per_clip: int):
         self.items = build_manifest(split)
