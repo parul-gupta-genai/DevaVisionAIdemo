@@ -31,16 +31,7 @@ def find_vehicle_images(search_dirs):
             continue
         for ext in ["*.jpg", "*.jpeg", "*.png", "*.JPG", "*.JPEG", "*.PNG"]:
             for f in p.rglob(ext):
-                name_lower = f.stem.lower()
-                parent_lower = str(f.parent).lower()
-                # Determine class from path or filename
-                label = None
-                if "tractor" in name_lower or "tractor" in parent_lower:
-                    label = "tractor"
-                elif "truck" in name_lower or "truck" in parent_lower:
-                    label = "truck"
-                if label:
-                    images[f.stem] = (f, label)
+                images[f.stem] = f
     return images
 
 
@@ -119,7 +110,21 @@ def main():
     images = find_vehicle_images(search_dirs)
     annotations = find_annotations(search_dirs)
     ids = sorted(set(images.keys()) & set(annotations.keys()))
-    print(f"Matched vehicle image+annotation pairs: {len(ids)}")
+    print(f"Matched vehicle image+annotation pairs initially: {len(ids)}")
+
+    if not ids:
+        try:
+            import kagglehub
+            print("\nNo local vehicle dataset found. Auto-downloading Vehicle dataset via kagglehub...")
+            kh_path = kagglehub.dataset_download("brsdsk/vehicle-detection-dataset")
+            print(f"Downloaded dataset to {kh_path}")
+            search_dirs.append(Path(kh_path))
+            images = find_vehicle_images(search_dirs)
+            annotations = find_annotations(search_dirs)
+            ids = sorted(set(images.keys()) & set(annotations.keys()))
+            print(f"Matched vehicle pairs after download: {len(ids)}")
+        except Exception as e:
+            print(f"kagglehub vehicle auto-download failed: {e}")
 
     if not ids:
         print("\nWARNING: No vehicle image+annotation pairs found!")
@@ -141,7 +146,7 @@ def main():
             lines = convert(annotations[stem])
             if not lines:
                 continue
-            src_img, _ = images[stem]
+            src_img = images[stem]
             shutil.copy(src_img, img_out / src_img.name)
             (lbl_out / f"{stem}.txt").write_text("\n".join(lines) + "\n")
             n_boxes += len(lines)
