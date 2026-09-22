@@ -198,11 +198,24 @@ def main():
                 print(f"Downloaded vehicle dataset to {kh_path}")
                 search_dirs.append(kh_path)
 
-                yaml_files = list(kh_path.rglob("data.yaml")) + list(kh_path.rglob("*.yaml"))
+                yaml_files = [f for f in list(kh_path.rglob("data.yaml")) + list(kh_path.rglob("*.yaml")) if f.name.lower() in ["data.yaml", "dataset.yaml"]]
                 if yaml_files:
-                    print(f"Found existing YOLO data.yaml at {yaml_files[0]}")
+                    yaml_src = yaml_files[0]
+                    print(f"Found existing YOLO data.yaml at {yaml_src}")
                     out_dir.mkdir(parents=True, exist_ok=True)
-                    shutil.copy(yaml_files[0], out_dir / "data.yaml")
+                    content = yaml_src.read_text()
+                    lines = content.splitlines()
+                    new_lines = []
+                    has_path = False
+                    for line in lines:
+                        if line.strip().startswith("path:"):
+                            new_lines.append(f"path: {yaml_src.parent.as_posix()}")
+                            has_path = True
+                        else:
+                            new_lines.append(line)
+                    if not has_path:
+                        new_lines.insert(0, f"path: {yaml_src.parent.as_posix()}")
+                    (out_dir / "data.yaml").write_text("\n".join(new_lines) + "\n")
                     print(f"Successfully configured YOLO dataset at {out_dir}")
                     return
 
