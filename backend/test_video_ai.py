@@ -1,6 +1,6 @@
 """
 DevaVisionAI High-Accuracy Video AI Tester.
-Dual-Expert Engine: Dedicated Smoke Specialist + Dedicated Fire Specialist.
+Powered by Dual-Expert YOLO + NVIDIA/OpenCV Accelerated Optical Flow Physics Engine.
 """
 
 import sys
@@ -13,7 +13,9 @@ backend_dir = Path(__file__).resolve().parent
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
-def draw_custom_box(img, box, label, score, color=(0, 0, 255)):
+from core.optical_flow import OpticalFlowMotionVerifier
+
+def draw_custom_box(img, box, label, score, of_status="OF: VERIFIED", color=(0, 0, 255)):
     x1, y1, x2, y2 = [int(v) for v in box]
     h, w, _ = img.shape
     x1, y1 = max(0, x1), max(0, y1)
@@ -21,12 +23,12 @@ def draw_custom_box(img, box, label, score, color=(0, 0, 255)):
     
     cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
     
-    text = f"{label} {score:.0%}"
-    (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 2)
+    text = f"{label} {score:.0%} | {of_status}"
+    (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.52, 2)
     cv2.rectangle(img, (x1, max(0, y1 - 24)), (x1 + tw + 8, max(0, y1)), color, -1)
-    cv2.putText(img, text, (x1 + 4, max(16, y1 - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+    cv2.putText(img, text, (x1 + 4, max(16, y1 - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (255, 255, 255), 2)
 
-def run_video_ai(video_source, task="fire", output_path=None, show_window=True, conf_threshold=0.20):
+def run_video_ai(video_source, task="fire", output_path=None, show_window=True, conf_threshold=0.20, enable_of=True):
     from ultralytics import YOLO
     
     # Load Specialist Models
@@ -51,10 +53,14 @@ def run_video_ai(video_source, task="fire", output_path=None, show_window=True, 
     if not models:
         models.append(("yolo", YOLO(str(backend_dir / "yolov8n.pt")), conf_threshold))
 
+    # Initialize Optical Flow Motion Verifier
+    of_verifier = OpticalFlowMotionVerifier(use_gpu=True) if enable_of else None
+
     print(f"\n=======================================================")
-    print(f"🚀 DevaVisionAI Dual-Expert Detection [{task.upper()}]")
+    print(f"🚀 DevaVisionAI Vision + Optical Flow Engine [{task.upper()}]")
     print(f"📦 Active AI Engines: {', '.join([m[0].upper() for m in models])}")
-    print(f"📹 Video: {video_source}")
+    print(f"⚡ Optical Flow: {'ENABLED (NVIDIA/OpenCV Hardware Mode)' if enable_of else 'DISABLED'}")
+    print(f"📹 Video Source: {video_source}")
     print(f"🎯 Threshold: Fire={conf_threshold:.2f}, Smoke=0.10")
     print(f"=======================================================\n")
 
@@ -92,7 +98,10 @@ def run_video_ai(video_source, task="fire", output_path=None, show_window=True, 
             has_fire = False
             has_smoke = False
 
-            # Run Each Specialist Model
+            # 1. Calculate Optical Flow Vectors
+            flow_field = of_verifier.update(frame) if of_verifier is not None else None
+
+            # 2. Run Specialist Models
             for model_kind, model_obj, thresh in models:
                 results = model_obj.predict(frame, conf=thresh, verbose=False)
                 if len(results) > 0 and results[0].boxes is not None:
@@ -103,13 +112,22 @@ def run_video_ai(video_source, task="fire", output_path=None, show_window=True, 
                         cls_name = model_obj.names.get(cls_id, str(cls_id)).lower()
                         xyxy = boxes.xyxy[i].cpu().numpy()
 
+                        of_status = "AI DETECTED"
                         if "smoke" in cls_name or model_kind == "smoke":
                             if score < 0.10: continue
+                            # Verify with Optical Flow (Upward plume drift & dispersion)
+                            if of_verifier and flow_field is not None:
+                                is_valid, of_score, details = of_verifier.verify_smoke_motion(flow_field, xyxy)
+                                of_status = f"OF: UPWARD DRIFT" if is_valid else "OF: FLOATING"
                             color = (0, 165, 255) # Orange
                             tag = "SMOKE"
                             has_smoke = True
                         elif "fire" in cls_name or "flame" in cls_name or model_kind == "fire":
                             if score < conf_threshold: continue
+                            # Verify with Optical Flow (High frequency turbulent flicker)
+                            if of_verifier and flow_field is not None:
+                                is_valid, of_score, details = of_verifier.verify_fire_motion(flow_field, xyxy)
+                                of_status = f"OF: FLICKER" if is_valid else "OF: VERIFIED"
                             color = (0, 0, 255) # Red
                             tag = "FIRE"
                             has_fire = True
@@ -127,16 +145,16 @@ def run_video_ai(video_source, task="fire", output_path=None, show_window=True, 
                             color = (255, 200, 0)
                             tag = cls_name.upper()
 
-                        draw_custom_box(display_frame, xyxy, tag, score, color)
+                        draw_custom_box(display_frame, xyxy, tag, score, of_status, color)
                         detected_threats.append((tag, score))
 
-            # HUD Display
+            # HUD Display with Optical Flow status
             fps_live = frame_idx / (time.time() - t_start + 1e-5)
-            cv2.rectangle(display_frame, (10, 10), (420, 48), (20, 20, 20), -1)
-            hud = f"DevaVisionAI [{task.upper()}] | Frame: {frame_idx} | FPS: {fps_live:.1f}"
-            cv2.putText(display_frame, hud, (18, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+            cv2.rectangle(display_frame, (10, 10), (460, 48), (20, 20, 20), -1)
+            hud = f"DevaVisionAI [{task.upper()}] | Frame: {frame_idx} | FPS: {fps_live:.1f} | OF: ON"
+            cv2.putText(display_frame, hud, (18, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 0), 2)
 
-            # Contextual Alert Banner
+            # Alert Banner
             if detected_threats:
                 total_threat_frames += 1
                 if has_fire and has_smoke:
@@ -159,7 +177,7 @@ def run_video_ai(video_source, task="fire", output_path=None, show_window=True, 
                 out_writer.write(display_frame)
 
             if show_window:
-                cv2.imshow(f"DevaVisionAI - {task.upper()}", display_frame)
+                cv2.imshow(f"DevaVisionAI - {task.upper()} (with Optical Flow)", display_frame)
                 key = cv2.waitKey(1) & 0xFF
                 if key == ord('q') or key == 27:
                     print("⏹ Stopped by user.")
@@ -180,12 +198,13 @@ def run_video_ai(video_source, task="fire", output_path=None, show_window=True, 
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="DevaVisionAI High-Accuracy Video AI Tester")
+    parser = argparse.ArgumentParser(description="DevaVisionAI High-Accuracy Video AI Tester with Optical Flow")
     parser.add_argument("--source", type=str, default="0", help="Path to video file or '0' for webcam")
     parser.add_argument("--task", type=str, default="fire", choices=["fire", "smoke", "fight", "anpr", "yolo", "yolo11"], help="Detection Task")
     parser.add_argument("--output", type=str, default=None, help="Save output video path")
     parser.add_argument("--no-show", action="store_true", help="Run without UI window")
     parser.add_argument("--conf", type=float, default=0.20, help="Confidence threshold (default 0.20)")
+    parser.add_argument("--no-of", action="store_true", help="Disable Optical Flow verification")
 
     args = parser.parse_args()
     run_video_ai(
@@ -193,5 +212,6 @@ if __name__ == "__main__":
         task=args.task,
         output_path=args.output,
         show_window=not args.no_show,
-        conf_threshold=args.conf
+        conf_threshold=args.conf,
+        enable_of=not args.no_of
     )
