@@ -33,10 +33,24 @@ def read_plate_tesseract(crop_bgr):
                 capture_output=True, text=True, timeout=5,
             )
         text = result.stdout.strip().upper()
-        return re.sub(r"[^A-Z0-9]", "", text)
+        res = re.sub(r"[^A-Z0-9]", "", text)
+        if res:
+            return res
     except Exception:
-        # Fallback if tesseract CLI binary is not installed in the environment
-        return ""
+        pass
+
+    try:
+        import easyocr
+        if not hasattr(read_plate_tesseract, "easy_reader"):
+            read_plate_tesseract.easy_reader = easyocr.Reader(['en'], gpu=False, verbose=False)
+        results = read_plate_tesseract.easy_reader.readtext(crop_bgr)
+        if results:
+            text = "".join([r[1] for r in results]).upper()
+            return re.sub(r"[^A-Z0-9]", "", text)
+    except Exception:
+        pass
+
+    return ""
 
 
 def char_accuracy(pred, truth):
