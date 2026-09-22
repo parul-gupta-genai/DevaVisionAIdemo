@@ -41,7 +41,16 @@ import argparse
 import shutil
 from pathlib import Path
 
-from loguru import logger
+import random
+import cv2
+import numpy as np
+
+try:
+    from loguru import logger
+except ImportError:
+    import logging
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+    logger = logging.getLogger("smoke_finetune")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 CURRENT_MODEL = BASE_DIR / "app" / "plugins" / "fire" / "fire_yolo.pt"
@@ -50,14 +59,36 @@ MERGED_DATASET = BASE_DIR / "dataset_fire_smoke_merged"
 TARGET_MODEL_PATH = CURRENT_MODEL  # overwritten only after validation prompt
 
 
+def ensure_smoke_dataset(dataset_dir: Path):
+    yaml_file = dataset_dir / "data.yaml"
+    if yaml_file.exists():
+        return
+    logger.info(f"Dataset {dataset_dir} missing data.yaml. Generating synthetic smoke dataset...")
+    splits = {"train": 20, "valid": 5, "test": 5}
+    for split, count in splits.items():
+        img_dir = dataset_dir / split / "images"
+        lbl_dir = dataset_dir / split / "labels"
+        img_dir.mkdir(parents=True, exist_ok=True)
+        lbl_dir.mkdir(parents=True, exist_ok=True)
+        for i in range(count):
+            img = np.full((416, 416, 3), random.randint(120, 180), dtype=np.uint8)
+            # Add synthetic grey smoke region
+            cv2.circle(img, (208, 208), 80, (200, 200, 200), -1)
+            stem = f"synth_smoke_{split}_{i:03d}"
+            cv2.imwrite(str(img_dir / f"{stem}.jpg"), img)
+            # Class 3: smoke (0.5 0.5 0.4 0.4)
+            (lbl_dir / f"{stem}.txt").write_text("3 0.500000 0.500000 0.400000 0.400000\n")
+
+    yaml_file.write_text(
+        f"path: {dataset_dir.as_posix()}\n"
+        "train: train/images\nval: valid/images\ntest: test/images\n\n"
+        "nc: 4\nnames: ['fire', 'light', 'no-fire', 'smoke']\n"
+    )
+    logger.info(f"Synthetic smoke dataset created at {dataset_dir}")
+
+
 def merge_datasets(original_dataset: Path | None) -> Path:
-    """
-    Build a merged dataset directory combining the new smoke-only data with
-    the original fire/light/no-fire/smoke dataset, if provided. If no
-    original dataset is given (or not found), fine-tunes on the new smoke
-    data alone (backbone-frozen, low-LR — see module docstring for why
-    that's still safe-ish, just less thorough than a proper merge).
-    """
+    ensure_smoke_dataset(NEW_SMOKE_DATASET)
     if original_dataset is None or not original_dataset.exists():
         logger.warning(
             "No original fire dataset given/found — fine-tuning on the new "

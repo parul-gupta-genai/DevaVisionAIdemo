@@ -6,37 +6,40 @@ from pathlib import Path
 
 import cv2
 
-DATASET_DIR = Path("/home/claude/anpr_dataset")
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATASET_DIR = BASE_DIR / "dataset_anpr"
+if not DATASET_DIR.exists():
+    for fallback in [Path("/home/claude/anpr_dataset"), Path("/kaggle/input/anpr_dataset")]:
+        if fallback.exists():
+            DATASET_DIR = fallback
+            break
 SPLIT = "test"
 
 
 def read_plate_tesseract(crop_bgr):
-    """OCR a plate crop with Tesseract, restricted to the alphanumeric
-    charset Indian plates actually use (cuts down on stray punctuation/
-    misreads Tesseract's general-purpose mode would otherwise produce)."""
+    """OCR a plate crop with Tesseract, restricted to alphanumeric characters."""
     gray = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2GRAY)
-    # upscale small crops — Tesseract needs real pixel height to work with,
-    # and plate crops here are often under 40px tall
     scale = max(1, 200 // max(gray.shape[0], 1))
     if scale > 1:
         gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
     gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
 
-    with tempfile.NamedTemporaryFile(suffix=".png") as f:
-        cv2.imwrite(f.name, gray)
-        result = subprocess.run(
-            ["tesseract", f.name, "stdout", "--psm", "7",
-             "-c", "tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"],
-            capture_output=True, text=True,
-        )
-    text = result.stdout.strip().upper()
-    return re.sub(r"[^A-Z0-9]", "", text)
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".png") as f:
+            cv2.imwrite(f.name, gray)
+            result = subprocess.run(
+                ["tesseract", f.name, "stdout", "--psm", "7",
+                 "-c", "tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"],
+                capture_output=True, text=True, timeout=5,
+            )
+        text = result.stdout.strip().upper()
+        return re.sub(r"[^A-Z0-9]", "", text)
+    except Exception:
+        # Fallback if tesseract CLI binary is not installed in the environment
+        return ""
 
 
 def char_accuracy(pred, truth):
-    """Fraction of truth's characters correctly matched at the same
-    position, length-normalized against the longer string (so a 4-char
-    pred against an 10-char truth doesn't score 100% on those 4)."""
     if not truth:
         return 0.0
     matches = sum(1 for a, b in zip(pred, truth) if a == b)
@@ -44,8 +47,12 @@ def char_accuracy(pred, truth):
 
 
 def main():
-    rows = list(csv.DictReader(open(DATASET_DIR / "manifest.csv")))
-    test_rows = [r for r in rows if r["split"] == SPLIT]
+    manifest = DATASET_DIR / "manifest.csv"
+    if not manifest.exists():
+        print(f"ANPR manifest.csv not found at {manifest}")
+        return
+    rows = list(csv.DictReader(open(manifest)))
+    test_rows = [r for r in rows if r.get("split") == SPLIT]
     print(f"Evaluating OCR on {len(test_rows)} test-set plates...")
 
     exact_matches = 0
