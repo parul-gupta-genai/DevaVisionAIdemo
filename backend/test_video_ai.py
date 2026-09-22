@@ -1,6 +1,6 @@
 """
 DevaVisionAI High-Accuracy Video AI Tester.
-Distinct real-time Fire & Smoke detection with separate tags and colors.
+Distinct real-time Fire & Smoke detection with calibrated per-class sensitivity.
 """
 
 import sys
@@ -31,7 +31,7 @@ def run_video_ai(video_source, task="fire", output_path=None, show_window=True, 
     
     model_paths = {
         "fire": backend_dir / "app" / "plugins" / "fire" / "fire_yolo.pt",
-        "smoke": backend_dir / "app" / "plugins" / "fire" / "fire_yolo.pt",
+        "smoke": backend_dir / "app" / "plugins" / "fire" / "smoke_finetuned.pt",
         "fight": backend_dir / "app" / "plugins" / "fight" / "fight_classifier_best.pt",
         "anpr": backend_dir / "indian_plate_yolo.pt",
         "yolo": backend_dir / "yolov8n.pt",
@@ -40,13 +40,15 @@ def run_video_ai(video_source, task="fire", output_path=None, show_window=True, 
 
     selected_model_path = model_paths.get(task.lower(), model_paths["fire"])
     if not selected_model_path.exists():
-        selected_model_path = backend_dir / "yolov8n.pt"
+        selected_model_path = backend_dir / "app" / "plugins" / "fire" / "fire_yolo.pt"
+        if not selected_model_path.exists():
+            selected_model_path = backend_dir / "yolov8n.pt"
 
     print(f"\n=======================================================")
     print(f"🚀 DevaVisionAI Smart Detection [{task.upper()}]")
     print(f"📦 Model: {selected_model_path.name}")
     print(f"📹 Video: {video_source}")
-    print(f"🎯 Threshold: {conf_threshold:.2f}")
+    print(f"🎯 Threshold: Fire={conf_threshold:.2f}, Smoke=0.08")
     print(f"=======================================================\n")
 
     model = YOLO(str(selected_model_path))
@@ -72,6 +74,10 @@ def run_video_ai(video_source, task="fire", output_path=None, show_window=True, 
     t_start = time.time()
     total_threat_frames = 0
 
+    # Smoke is visually softer/lower contrast than bright flames, so we use conf=0.08 for smoke
+    smoke_conf_floor = 0.08
+    base_predict_conf = min(conf_threshold, smoke_conf_floor)
+
     print("▶ Running Detection... Press 'q' on the video window to stop.\n")
     try:
         while True:
@@ -85,8 +91,8 @@ def run_video_ai(video_source, task="fire", output_path=None, show_window=True, 
             has_fire = False
             has_smoke = False
 
-            # YOLO AI Inference
-            results = model.predict(frame, conf=conf_threshold, verbose=False)
+            # YOLO AI Inference at lower base floor to catch soft smoke
+            results = model.predict(frame, conf=base_predict_conf, verbose=False)
             if len(results) > 0 and results[0].boxes is not None:
                 boxes = results[0].boxes
                 for i in range(len(boxes)):
@@ -95,22 +101,32 @@ def run_video_ai(video_source, task="fire", output_path=None, show_window=True, 
                     cls_name = model.names.get(cls_id, str(cls_id)).lower()
                     xyxy = boxes.xyxy[i].cpu().numpy()
 
-                    # Class Check
-                    if "fire" in cls_name or "flame" in cls_name:
-                        color = (0, 0, 255) # Bright Red
-                        tag = "FIRE"
-                        has_fire = True
-                    elif "smoke" in cls_name:
-                        color = (0, 165, 255) # Bright Orange
+                    # Class filtering & per-class confidence threshold
+                    if "smoke" in cls_name:
+                        if score < smoke_conf_floor:
+                            continue
+                        color = (0, 165, 255) # Orange
                         tag = "SMOKE"
                         has_smoke = True
+                    elif "fire" in cls_name or "flame" in cls_name:
+                        if score < conf_threshold:
+                            continue
+                        color = (0, 0, 255) # Red
+                        tag = "FIRE"
+                        has_fire = True
                     elif "fight" in cls_name:
+                        if score < conf_threshold:
+                            continue
                         color = (255, 0, 128)
                         tag = "FIGHT"
                     elif "plate" in cls_name:
+                        if score < conf_threshold:
+                            continue
                         color = (0, 255, 0)
                         tag = "LICENSE PLATE"
                     else:
+                        if score < conf_threshold or cls_name in ["no-fire", "no fire", "nofire", "light", "background"]:
+                            continue
                         color = (255, 200, 0)
                         tag = cls_name.upper()
 
