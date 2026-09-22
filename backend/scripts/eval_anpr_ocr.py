@@ -90,6 +90,12 @@ def main():
         if not is_exact and len(failures) < 15:
             failures.append((row["image"], truth, pred, round(ca, 2)))
 
+    if n == 0:
+        print("\n=== OCR (Tesseract) RESULTS on 0 held-out test plates ===")
+        print("No valid plate OCR results obtained. Tesseract CLI binary is not installed in this environment.")
+        print("To run Tesseract OCR evaluation, install tesseract-ocr: !apt-get update && !apt-get install -y tesseract-ocr")
+        return
+
     print(f"\n=== OCR (Tesseract) RESULTS on {n} held-out test plates ===")
     print(f"Exact string match:        {exact_matches}/{n} = {exact_matches/n*100:.1f}%")
     print(f"Avg character accuracy:    {char_acc_sum/n*100:.1f}%")

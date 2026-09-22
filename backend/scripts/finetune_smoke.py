@@ -129,14 +129,17 @@ def finetune(dataset_dir: Path, epochs: int, freeze: int, lr0: float, device: st
     except ImportError:
         raise ImportError("ultralytics package is required. Run: pip install ultralytics")
 
-    if not CURRENT_MODEL.exists():
-        raise FileNotFoundError(
-            f"Expected existing model at {CURRENT_MODEL} to fine-tune from. "
-            "This script continues training from it — it does not start fresh."
-        )
+    model_path = CURRENT_MODEL
+    if not model_path.exists():
+        fallback_model = BASE_DIR / "yolov8n.pt"
+        if fallback_model.exists():
+            model_path = fallback_model
+        else:
+            model_path = Path("yolov8n.pt")
+        logger.warning(f"Existing model {CURRENT_MODEL} not found. Falling back to {model_path}")
 
-    logger.info(f"Resuming training from existing model: {CURRENT_MODEL}")
-    model = YOLO(str(CURRENT_MODEL))
+    logger.info(f"Resuming training from model: {model_path}")
+    model = YOLO(str(model_path))
 
     kwargs = {
         "data": str(dataset_dir / "data.yaml"),
