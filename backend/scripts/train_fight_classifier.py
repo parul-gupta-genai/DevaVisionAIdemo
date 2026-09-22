@@ -93,7 +93,12 @@ def sample_frames(video_path: Path, n_frames: int):
 
 
 def ensure_fight_dataset():
-    if not DATASET_DIR.exists() or not any(DATASET_DIR.rglob("*.mp4")):
+    has_v = (DATASET_DIR / "train" / "Violence").exists() and any((DATASET_DIR / "train" / "Violence").rglob("*.*"))
+    has_nv = (DATASET_DIR / "train" / "NonViolence").exists() and any((DATASET_DIR / "train" / "NonViolence").rglob("*.*"))
+    if not DATASET_DIR.exists() or not (has_v and has_nv):
+        if DATASET_DIR.exists() and not (has_v and has_nv):
+            print("Dataset directory incomplete (missing Violence or NonViolence). Re-building...")
+            shutil.rmtree(DATASET_DIR, ignore_errors=True)
         print(f"Dataset directory {DATASET_DIR} empty or missing.")
         try:
             import kagglehub
@@ -110,7 +115,7 @@ def ensure_fight_dataset():
                     name_lower = p.name.lower()
                     if "nonviolence" in name_lower or "non_violence" in name_lower or "non-violence" in name_lower:
                         nv_dir = p
-                    elif "violence" in name_lower and not nv_dir:
+                    elif "violence" in name_lower and not ("non" in name_lower):
                         v_dir = p
 
             if v_dir and nv_dir:
