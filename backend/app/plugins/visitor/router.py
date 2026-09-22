@@ -11,8 +11,13 @@ from app.plugins.visitor.models import Visitor, Visit, VisitorEvent
 from app.plugins.visitor.events import VisitorEventType
 from pydantic import BaseModel
 from datetime import datetime
-from config.config import config
-from detection.face_factory import FaceFactory
+try:
+    from detection.face_factory import FaceFactory
+except ImportError:
+    class FaceFactory:
+        @staticmethod
+        def create(*args, **kwargs):
+            return None
 from app.auth.dependencies import get_current_user
 
 import uuid

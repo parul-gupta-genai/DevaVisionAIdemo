@@ -9,7 +9,14 @@ import time
 from loguru import logger
 
 from config.config import config
-from core.events.bus import RedisEventBus
+try:
+    from core.events.bus import RedisEventBus
+except ImportError:
+    class RedisEventBus:
+        def __init__(self, *args, **kwargs):
+            pass
+        def publish(self, *args, **kwargs):
+            pass
 from api.server import app  # Required for uvicorn main:app
 
 def ds_consumer(result_queue: queue.Queue):
