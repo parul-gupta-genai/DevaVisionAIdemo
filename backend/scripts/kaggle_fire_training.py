@@ -42,52 +42,82 @@ print(f"VRAM          : {torch.cuda.get_device_properties(0).total_memory // (10
 # roboflow.com par account banao -> workspace -> fire dataset -> Export -> YOLO v8
 ROBOFLOW_API_KEY = ""  # <- apna API key yahan paste karo (optional)
 
+# Auto-discovery logic for Kaggle inputs & datasets
 DATASET_DIR = Path("/kaggle/working/dataset_fire")
+DATA_YAML = None
 
+# Step 1: Check if Roboflow API key provided
 if ROBOFLOW_API_KEY:
-    from roboflow import Roboflow
-    rf = Roboflow(api_key=ROBOFLOW_API_KEY)
-    # Publicly available fire+smoke dataset
-    project = rf.workspace("roboflow-universe-projects").project("fire-detection-mwnkh")
-    dataset = project.version(2).download("yolov8", location=str(DATASET_DIR))
-    DATA_YAML = str(DATASET_DIR / "data.yaml")
-    print(f"Dataset downloaded to: {DATASET_DIR}")
-else:
-    # Option B: Apna dataset ZIP Kaggle pe upload karo
-    # Kaggle > + Add Data > Upload > fire_smoke_dataset.zip
-    # Phir path set karo:
-    UPLOADED_ZIP = "/kaggle/input/fire-smoke-dataset/fire_smoke_dataset.zip"  # <- apna path
+    try:
+        from roboflow import Roboflow
+        rf = Roboflow(api_key=ROBOFLOW_API_KEY)
+        project = rf.workspace("roboflow-universe-projects").project("fire-detection-mwnkh")
+        dataset = project.version(2).download("yolov8", location=str(DATASET_DIR))
+        DATA_YAML = str(DATASET_DIR / "data.yaml")
+        print(f"Dataset downloaded via Roboflow API: {DATASET_DIR}")
+    except Exception as e:
+        print(f"Roboflow download failed: {e}")
 
-    if Path(UPLOADED_ZIP).exists():
+# Step 2: Auto-find any data.yaml anywhere under /kaggle/input/
+if not DATA_YAML:
+    kaggle_input = Path("/kaggle/input")
+    if kaggle_input.exists():
+        found_yamls = list(kaggle_input.rglob("data.yaml")) + list(kaggle_input.rglob("*.yaml"))
+        # Filter for actual YOLO data yamls (containing train and val keys)
+        for ypath in found_yamls:
+            try:
+                import yaml
+                with open(ypath, "r") as f:
+                    content = yaml.safe_load(f)
+                if isinstance(content, dict) and ("train" in content or "names" in content):
+                    DATA_YAML = str(ypath)
+                    print(f"✅ Auto-discovered dataset data.yaml at: {DATA_YAML}")
+                    break
+            except Exception:
+                continue
+
+# Step 3: Auto-find any .zip file in /kaggle/input/ and extract
+if not DATA_YAML and kaggle_input.exists():
+    found_zips = list(kaggle_input.rglob("*.zip"))
+    if found_zips:
+        zip_path = found_zips[0]
+        print(f"Found zip in Kaggle input: {zip_path}, extracting...")
         import zipfile
         DATASET_DIR.mkdir(parents=True, exist_ok=True)
-        with zipfile.ZipFile(UPLOADED_ZIP, "r") as z:
+        with zipfile.ZipFile(zip_path, "r") as z:
             z.extractall(DATASET_DIR)
-        print(f"Dataset extracted to: {DATASET_DIR}")
+        
+        yamls = list(DATASET_DIR.rglob("data.yaml"))
+        if yamls:
+            DATA_YAML = str(yamls[0])
+            print(f"Extracted dataset data.yaml at: {DATA_YAML}")
 
-        # data.yaml mein path fix karo
-        import yaml
-        yaml_path = DATASET_DIR / "data.yaml"
-        if yaml_path.exists():
-            with open(yaml_path, "r") as f:
-                data = yaml.safe_load(f)
-            data["path"] = str(DATASET_DIR)
-            data["train"] = "train/images"
-            data["val"]   = "valid/images"
-            data["test"]  = "test/images"
-            with open(yaml_path, "w") as f:
-                yaml.safe_dump(data, f)
-            DATA_YAML = str(yaml_path)
-            print(f"data.yaml updated: {data}")
-    else:
-        # Option C: Direct Kaggle dataset use karo
-        # https://www.kaggle.com/datasets/atulyakumar98/fire-and-smoke-dataset
-        print("No dataset found. Use Roboflow API key or upload your ZIP.")
-        print("Alternatively, add a Kaggle dataset via + Add Data")
+# Step 4: Fallback — Auto-download public open-source Fire & Smoke dataset
+if not DATA_YAML:
+    print("🌐 No local/Kaggle dataset found. Downloading public Fire & Smoke YOLO dataset...")
+    PUBLIC_ZIP_URL = "https://github.com/roboflow/notebooks/raw/main/assets/fire-smoke-dataset.zip" # Fallback sample or Roboflow public URL
+    # Let's download direct public Roboflow fire dataset zip
+    import urllib.request
+    zip_dest = Path("/kaggle/working/fire_dataset_public.zip")
+    
+    # Try public Roboflow direct download link for fire detection
+    ROBOFLOW_PUBLIC_URL = "https://universe.roboflow.com/ds/Z043w0T7uH?key=O526N3R88x"
+    print(f"Downloading from public Roboflow release...")
+    try:
+        urllib.request.urlretrieve(ROBOFLOW_PUBLIC_URL, zip_dest)
+        import zipfile
+        DATASET_DIR.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(zip_dest, "r") as z:
+            z.extractall(DATASET_DIR)
+        yamls = list(DATASET_DIR.rglob("data.yaml"))
+        if yamls:
+            DATA_YAML = str(yamls[0])
+            print(f"✅ Public dataset ready at: {DATA_YAML}")
+    except Exception as err:
+        print(f"Failed auto-download: {err}")
 
-        # Fallback: create a minimal data.yaml pointing to a Kaggle dataset
-        # (replace with your actual Kaggle dataset path)
-        DATA_YAML = "/kaggle/input/fire-smoke-yolo/data.yaml"
+if not DATA_YAML:
+    raise FileNotFoundError("Could not find or download any dataset. Please add a Kaggle dataset via '+ Add Data' or upload a dataset ZIP.")
 
 
 # ============================================================
