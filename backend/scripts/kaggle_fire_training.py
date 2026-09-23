@@ -95,26 +95,32 @@ if not DATA_YAML and kaggle_input.exists():
 # Step 4: Fallback — Auto-download public open-source Fire & Smoke dataset
 if not DATA_YAML:
     print("🌐 No local/Kaggle dataset found. Downloading public Fire & Smoke YOLO dataset...")
-    PUBLIC_ZIP_URL = "https://github.com/roboflow/notebooks/raw/main/assets/fire-smoke-dataset.zip" # Fallback sample or Roboflow public URL
-    # Let's download direct public Roboflow fire dataset zip
-    import urllib.request
     zip_dest = Path("/kaggle/working/fire_dataset_public.zip")
     
-    # Try public Roboflow direct download link for fire detection
-    ROBOFLOW_PUBLIC_URL = "https://universe.roboflow.com/ds/Z043w0T7uH?key=O526N3R88x"
-    print(f"Downloading from public Roboflow release...")
-    try:
-        urllib.request.urlretrieve(ROBOFLOW_PUBLIC_URL, zip_dest)
-        import zipfile
-        DATASET_DIR.mkdir(parents=True, exist_ok=True)
-        with zipfile.ZipFile(zip_dest, "r") as z:
-            z.extractall(DATASET_DIR)
-        yamls = list(DATASET_DIR.rglob("data.yaml"))
-        if yamls:
-            DATA_YAML = str(yamls[0])
-            print(f"✅ Public dataset ready at: {DATA_YAML}")
-    except Exception as err:
-        print(f"Failed auto-download: {err}")
+    # Direct dataset download URLs (with User-Agent bypass)
+    urls = [
+        "https://universe.roboflow.com/ds/Z043w0T7uH?key=O526N3R88x",
+        "https://github.com/roboflow/notebooks/raw/main/assets/fire-smoke-dataset.zip"
+    ]
+    
+    for url in urls:
+        print(f"Downloading dataset from: {url} ...")
+        try:
+            cmd = ["curl", "-sSL", "-A", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "-o", str(zip_dest), url]
+            subprocess.run(cmd, check=True)
+            
+            if zip_dest.exists() and zip_dest.stat().st_size > 1000:
+                import zipfile
+                DATASET_DIR.mkdir(parents=True, exist_ok=True)
+                with zipfile.ZipFile(zip_dest, "r") as z:
+                    z.extractall(DATASET_DIR)
+                yamls = list(DATASET_DIR.rglob("data.yaml"))
+                if yamls:
+                    DATA_YAML = str(yamls[0])
+                    print(f"✅ Public dataset extracted and ready at: {DATA_YAML}")
+                    break
+        except Exception as err:
+            print(f"Download attempt failed: {err}")
 
 if not DATA_YAML:
     raise FileNotFoundError("Could not find or download any dataset. Please add a Kaggle dataset via '+ Add Data' or upload a dataset ZIP.")
