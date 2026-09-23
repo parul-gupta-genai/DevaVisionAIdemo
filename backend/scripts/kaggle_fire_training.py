@@ -92,35 +92,54 @@ if not DATA_YAML and kaggle_input.exists():
             DATA_YAML = str(yamls[0])
             print(f"Extracted dataset data.yaml at: {DATA_YAML}")
 
-# Step 4: Fallback — Auto-download public open-source Fire & Smoke dataset
+# Step 4: Fallback — Clone open YOLO Fire & Smoke dataset repository from GitHub
 if not DATA_YAML:
-    print("🌐 No local/Kaggle dataset found. Downloading public Fire & Smoke YOLO dataset...")
-    zip_dest = Path("/kaggle/working/fire_dataset_public.zip")
-    
-    # Direct dataset download URLs (with User-Agent bypass)
-    urls = [
-        "https://universe.roboflow.com/ds/Z043w0T7uH?key=O526N3R88x",
-        "https://github.com/roboflow/notebooks/raw/main/assets/fire-smoke-dataset.zip"
+    print("🌐 No local/Kaggle dataset found. Cloning public Fire & Smoke YOLO dataset from GitHub...")
+    git_repos = [
+        "https://github.com/mehmoodulhaq570/Smart-Fire-System-Yolov11n.git",
+        "https://github.com/AresGod96/FireDet-YOLOv8.git"
     ]
     
-    for url in urls:
-        print(f"Downloading dataset from: {url} ...")
+    for repo_url in git_repos:
+        print(f"Cloning dataset repo: {repo_url} ...")
         try:
-            cmd = ["curl", "-sSL", "-A", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "-o", str(zip_dest), url]
-            subprocess.run(cmd, check=True)
+            target_git_dir = Path("/kaggle/working/dataset_git")
+            if target_git_dir.exists():
+                import shutil
+                shutil.rmtree(target_git_dir, ignore_errors=True)
+            subprocess.run(["git", "clone", "--depth", "1", repo_url, str(target_git_dir)], check=True)
             
-            if zip_dest.exists() and zip_dest.stat().st_size > 1000:
-                import zipfile
-                DATASET_DIR.mkdir(parents=True, exist_ok=True)
-                with zipfile.ZipFile(zip_dest, "r") as z:
-                    z.extractall(DATASET_DIR)
-                yamls = list(DATASET_DIR.rglob("data.yaml"))
-                if yamls:
-                    DATA_YAML = str(yamls[0])
-                    print(f"✅ Public dataset extracted and ready at: {DATA_YAML}")
-                    break
+            found_yamls = list(target_git_dir.rglob("data.yaml")) + list(target_git_dir.rglob("*.yaml"))
+            for ypath in found_yamls:
+                try:
+                    import yaml
+                    with open(ypath, "r") as f:
+                        c = yaml.safe_load(f)
+                    if isinstance(c, dict) and ("train" in c or "names" in c):
+                        DATA_YAML = str(ypath)
+                        print(f"✅ Downloaded & configured public dataset at: {DATA_YAML}")
+                        break
+                except Exception:
+                    continue
+            if DATA_YAML:
+                break
         except Exception as err:
-            print(f"Download attempt failed: {err}")
+            print(f"Git clone attempt failed for {repo_url}: {err}")
+
+# Step 5: Ensure data.yaml has valid absolute path prefix
+if DATA_YAML:
+    try:
+        import yaml
+        yaml_path = Path(DATA_YAML)
+        with open(yaml_path, "r", encoding="utf-8") as f:
+            ydata = yaml.safe_load(f)
+        if isinstance(ydata, dict):
+            ydata["path"] = str(yaml_path.parent.resolve())
+            with open(yaml_path, "w", encoding="utf-8") as f:
+                yaml.safe_dump(ydata, f)
+            print(f"Patched data.yaml 'path' to: {ydata['path']}")
+    except Exception as patch_err:
+        print(f"YAML patch note: {patch_err}")
 
 if not DATA_YAML:
     raise FileNotFoundError("Could not find or download any dataset. Please add a Kaggle dataset via '+ Add Data' or upload a dataset ZIP.")
