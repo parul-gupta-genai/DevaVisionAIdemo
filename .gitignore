@@ -15,3 +15,8 @@ __pycache__/
 *.engine
 *.joblib
 devavision.db
+cache/
+scratch/
+fire_test_output.jpg
+backend/runs_fire/
+backend/dataset_fire_smoke_combined/

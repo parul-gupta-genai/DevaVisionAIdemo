@@ -20,6 +20,11 @@ class OpticalFlowMotionVerifier:
         self.gpu_available = False
         self.cuda_flow = None
 
+        # Honour USE_GPU env var so disabling GPU globally also disables CUDA flow.
+        import os
+        _use_gpu_env = os.getenv("USE_GPU", "true").lower() not in ("false", "0", "no")
+        use_gpu = use_gpu and _use_gpu_env
+
         # Attempt to initialize OpenCV CUDA / NVIDIA Optical Flow if available
         if use_gpu:
             try:
@@ -58,7 +63,7 @@ class OpticalFlowMotionVerifier:
                 gpu_prev = cv2.cuda_GpuMat()
                 gpu_curr = cv2.cuda_GpuMat()
                 gpu_prev.upload(self.prev_gray)
-                gpu_curr.upload(self.curr_gray)
+                gpu_curr.upload(curr_gray)   # BUG FIX: was self.curr_gray (undefined)
                 gpu_flow = self.cuda_flow.calc(gpu_prev, gpu_curr, None)
                 flow_small = gpu_flow.download()
             except Exception:
@@ -112,21 +117,25 @@ class OpticalFlowMotionVerifier:
         mag = np.hypot(u, v)
         mean_mag = float(np.mean(mag))
         
-        # 3. Turbulent Non-Rigid Variance (rigid objects have low variance)
+        # 3. Turbulent Non-Rigid Variance (rigid objects have low variance).
+        # Weight directional variance separately: smoke has high variance in
+        # both axes, a rigid moving object mainly in one.
         u_var = float(np.var(u))
         v_var = float(np.var(v))
-        turbulence_score = min(1.0, (u_var + v_var) / 4.0)
+        # Combined score peaks when BOTH axes churn (true smoke/plume behaviour)
+        turbulence_score = min(1.0, (u_var * 0.4 + v_var * 0.6) / 3.0)
 
         # Smoke Verification Score Formulation
         smoke_score = 0.0
-        if mean_vy < 0.05: # moving upward or floating
+        if mean_vy < 0.05:          # moving upward or floating
             smoke_score += 0.40
-        if upward_ratio > 0.20: # at least 20% pixels rising
+        if upward_ratio > 0.15:     # at least 15% pixels rising (was 0.20 — more sensitive)
             smoke_score += 0.35
-        if turbulence_score > 0.05: # turbulent diffuse dispersion
+        if turbulence_score > 0.04: # turbulent diffuse dispersion (was 0.05)
             smoke_score += 0.25
 
-        is_verified = (smoke_score >= 0.35) or (mean_mag > 0.25 and mean_vy <= 0.2)
+        # Verified if score meets lower threshold OR motion magnitude is clear
+        is_verified = (smoke_score >= 0.30) or (mean_mag > 0.20 and mean_vy <= 0.2)
         
         details = {
             "upward_ratio": round(upward_ratio, 2),

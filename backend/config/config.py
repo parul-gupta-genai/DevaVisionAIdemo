@@ -151,6 +151,23 @@ class AppConfig(BaseSettings):
     OPENAI_API_KEY: str = Field(default="", description="OpenAI API Key")
     OPENAI_MODEL: str = Field(default="gpt-4o-mini", description="OpenAI Model")
 
+    # ── GPU / Inference Settings ─────────────────────────────────────────────
+    # These mirror the env vars read by gpu_utils.get_device() /
+    # get_fp16_enabled() so the settings are documented in one place.
+    # Set USE_GPU=false in .env to force CPU-only mode on any machine.
+    USE_GPU: bool = Field(
+        default=True,
+        description="Use NVIDIA GPU (CUDA) for inference when available. Set false to force CPU."
+    )
+    GPU_FP16: bool = Field(
+        default=True,
+        description="Use FP16 (half-precision) on GPU for 2x speed boost. Ignored on CPU."
+    )
+    GPU_OPTICAL_FLOW: bool = Field(
+        default=True,
+        description="Use NVIDIA CUDA Optical Flow (OpenCV CUDA build required). Falls back to CPU."
+    )
+
     # Voice Assistant Settings
     VOICE_STT_ENGINE: str = Field(default="browser", description="Voice STT engine")
     VOICE_TTS_ENGINE: str = Field(default="browser", description="Voice TTS engine")

@@ -161,8 +161,8 @@ def test_fire_inference(source_path: str = None, output_path: str = "fire_test_o
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Test Fire Detection Inference")
-    parser.add_argument("--image", type=str, help="Path to input image or video file", default=None)
-    parser.add_argument("--output", type=str, help="Path to save annotated output file", default="fire_test_output.mp4")
+    parser.add_argument("--image", "--source", "-s", dest="image", type=str, help="Path to input image or video file", default=None)
+    parser.add_argument("--output", "-o", type=str, help="Path to save annotated output file", default="fire_test_output.jpg")
     args = parser.parse_args()
 
     test_fire_inference(source_path=args.image, output_path=args.output)

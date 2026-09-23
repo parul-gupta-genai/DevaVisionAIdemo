@@ -4,9 +4,14 @@ Automated Training Script for Fire Detection Dataset.
 This script:
   1. Unzips the fire-detection.v1i.yolov8.zip dataset.
   2. Updates data.yaml with proper local paths.
-  3. Fine-tunes YOLOv8n on the dataset.
+  3. Fine-tunes YOLO11n (or yolo11s for better accuracy) on the dataset.
   4. Copies the resulting best.pt weights to backend/app/plugins/fire/fire_yolo.pt.
   5. Validates the trained model.
+
+Recommended base models (via --model flag):
+  yolo11n.pt  — default, fast (5.4 MB, +2% mAP vs yolov8n)
+  yolo11s.pt  — better accuracy, GPU recommended
+  yolov10n.pt — NMS-free, set USE_YOLOV10=true in .env after training
 """
 
 import os
@@ -60,12 +65,30 @@ def fix_data_yaml():
     return yaml_path
 
 
-def train_model(data_yaml_path, model_name="yolov8n.pt", epochs=15, device=None):
-    """Fine-tune YOLO model (yolov8n, yolov8s, yolov8m, etc.) on the dataset."""
+def train_model(data_yaml_path, model_name=None, epochs=15, device=None):
+    """Fine-tune YOLO model on the fire dataset.
+
+    Default model is GPU-aware:
+      GPU available -> yolo11s.pt  (better accuracy, 47.0 mAP)
+      CPU only      -> yolo11n.pt  (fast, 39.5 mAP)
+    Override with the --model flag.
+    """
     try:
-        from ultralytics import YOLO
+        from ultralytics import YOLO  # noqa: PLC0415
     except ImportError:
         raise ImportError("ultralytics package is required. Run: pip install ultralytics")
+
+    # Auto-select model based on GPU availability if not explicitly set
+    if model_name is None:
+        try:
+            import torch  # noqa: PLC0415
+            model_name = "yolo11s.pt" if torch.cuda.is_available() else "yolo11n.pt"
+        except Exception:
+            model_name = "yolo11n.pt"
+        logger.info(
+            f"Auto-selected base model: {model_name} "
+            f"(GPU detected: {'yes' if 'yolo11s' in model_name else 'no'})"
+        )
 
     logger.info(f"Starting YOLO training using baseline model: {model_name}")
     model = YOLO(model_name)
@@ -73,7 +96,7 @@ def train_model(data_yaml_path, model_name="yolov8n.pt", epochs=15, device=None)
     kwargs = {
         "data": str(data_yaml_path),
         "epochs": epochs,
-        "imgsz": 640 if "m" in model_name or "s" in model_name else 416,
+        "imgsz": 640,   # YOLO11 optimal; was 416 for small v8 models (incorrect)
         "batch": 16,
         "workers": 2,
         "project": str(BASE_DIR / "runs_fire"),
@@ -103,7 +126,15 @@ def train_model(data_yaml_path, model_name="yolov8n.pt", epochs=15, device=None)
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="Train Fire Detection YOLO Model")
-    parser.add_argument("--model", type=str, default="yolov8n.pt", help="Base model: yolov8n.pt, yolov8s.pt, yolov8m.pt, etc.")
+    parser.add_argument(
+        "--model", type=str, default=None,
+        help=(
+            "Base model for fine-tuning. Default: auto (yolo11s on GPU, yolo11n on CPU).\n"
+            "  GPU options : yolo11s.pt (recommended), yolo11m.pt, yolov8s.pt\n"
+            "  CPU options : yolo11n.pt, yolov8n.pt\n"
+            "  NMS-free    : yolov10n.pt (also set USE_YOLOV10=true in .env)"
+        )
+    )
     parser.add_argument("--epochs", type=int, default=15, help="Number of training epochs")
     parser.add_argument("--device", type=str, default=None, help="Device: '0' for GPU 0, 'cpu' for CPU")
     args = parser.parse_args()

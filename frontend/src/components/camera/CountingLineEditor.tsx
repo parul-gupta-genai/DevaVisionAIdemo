@@ -314,59 +314,61 @@ export const CountingLineEditor = memo(({ cameraId, cameraName, onClose }: Count
       />
 
       {/* Control panel */}
-      <div className="absolute top-3 left-3 w-72 max-w-[85%] bg-slate-950/85 backdrop-blur-md border border-cyan-500/30 rounded-xl shadow-2xl overflow-hidden pointer-events-auto">
-        <div className="px-3 py-2.5 flex items-center justify-between border-b border-foreground/10 bg-cyan-500/10">
-          <div className="flex items-center gap-2 text-cyan-300">
-            <Spline className="w-4 h-4" />
-            <span className="text-xs font-bold uppercase tracking-widest">People Counting Lines</span>
+      <div className="absolute top-3 left-3 w-80 max-w-[90%] bg-slate-950/95 backdrop-blur-xl border border-cyan-500/50 rounded-2xl shadow-2xl overflow-hidden pointer-events-auto ring-1 ring-cyan-500/20">
+        <div className="px-4 py-3 flex items-center justify-between border-b border-cyan-500/20 bg-cyan-500/15">
+          <div className="flex items-center gap-2 text-cyan-300 font-bold">
+            <Spline className="w-4 h-4 text-cyan-400" />
+            <span className="text-xs font-extrabold uppercase tracking-wider text-white">Tripwire Counting Lines</span>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded hover:bg-foreground/10 text-foreground/60 hover:text-white transition-colors"
+            className="p-1.5 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
             title="Close editor"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="px-3 py-2 text-[11px] leading-relaxed text-foreground/70">
-          Drag on the live video to draw a counting line — it goes live instantly, no stream restart.
-          The <span className="text-emerald-400 font-bold">green arrow</span> marks the IN direction; use ⇄ to flip it.
-          {cameraName ? <span className="block mt-1 text-foreground/40">Camera: {cameraName}</span> : null}
+        <div className="px-4 py-3 text-xs leading-relaxed text-slate-100 bg-slate-900/60 border-b border-slate-800">
+          <p className="font-semibold text-white">Drag on the video to draw a counting line — goes live instantly.</p>
+          <span className="block mt-1.5 text-[11px] text-cyan-300 font-medium bg-cyan-500/10 px-2 py-1 rounded border border-cyan-500/20">
+            The <span className="text-emerald-400 font-bold">green arrow</span> marks the IN direction; use ⇄ to flip it.
+          </span>
+          {cameraName ? <span className="block mt-1.5 text-[11px] text-cyan-300 font-medium">📷 Camera: {cameraName}</span> : null}
         </div>
 
-        <div className="px-3 pb-2 flex flex-col gap-1.5 max-h-40 overflow-y-auto">
+        <div className="px-4 py-3 flex flex-col gap-2 max-h-48 overflow-y-auto">
           {!loaded ? (
             loadFailed ? (
               <button
                 onClick={loadLines}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-danger/10 hover:bg-danger/20 text-danger border border-danger/30 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-danger/20 hover:bg-danger/30 text-danger border border-danger/40 transition-colors"
               >
-                <RefreshCw className="w-3 h-3" /> Failed to load current lines — Retry
+                <RefreshCw className="w-3.5 h-3.5" /> Retry Loading Lines
               </button>
             ) : (
-              <div className="text-[11px] text-foreground/40 py-1">Loading…</div>
+              <div className="text-xs text-slate-300 py-1">Loading lines…</div>
             )
           ) : lines.length === 0 ? (
-            <div className="text-[11px] text-foreground/50 py-1 italic">
+            <div className="text-xs text-slate-300 py-2 italic font-medium bg-slate-900/40 p-2.5 rounded-xl border border-slate-800">
               {usingDefault
-                ? 'Using the default entry line — draw to replace it.'
-                : 'No lines — crossing counting is off. Draw one to start.'}
+                ? 'Using default roadway line — drag anywhere on video to place custom tripwire.'
+                : 'No custom lines — drag on video to draw a counting line.'}
             </div>
           ) : (
             lines.map((line, i) => (
               <div
                 key={line.id}
-                className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-foreground/5 border border-foreground/10 text-[11px] text-white"
+                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-750 text-xs text-white shadow-sm"
               >
-                <span className="w-4 h-4 rounded-full bg-cyan-500/20 text-cyan-300 flex items-center justify-center font-bold text-[9px] shrink-0">
+                <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-300 flex items-center justify-center font-extrabold text-[10px] shrink-0 border border-cyan-500/40">
                   {i + 1}
                 </span>
-                <span className="flex-1 truncate font-semibold">{line.name}</span>
+                <span className="flex-1 truncate font-bold text-white text-xs">{line.name}</span>
                 <button
                   onClick={() => flipLine(line.id)}
                   disabled={saving}
-                  className="p-1 rounded hover:bg-emerald-500/20 text-emerald-400 transition-colors disabled:opacity-40"
+                  className="p-1.5 rounded-lg hover:bg-emerald-500/20 text-emerald-400 transition-colors disabled:opacity-40"
                   title="Flip IN/OUT direction"
                 >
                   <ArrowLeftRight className="w-3.5 h-3.5" />
@@ -374,7 +376,7 @@ export const CountingLineEditor = memo(({ cameraId, cameraName, onClose }: Count
                 <button
                   onClick={() => deleteLine(line.id)}
                   disabled={saving}
-                  className="p-1 rounded hover:bg-danger/20 text-danger transition-colors disabled:opacity-40"
+                  className="p-1.5 rounded-lg hover:bg-danger/20 text-danger transition-colors disabled:opacity-40"
                   title="Delete line"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -384,25 +386,25 @@ export const CountingLineEditor = memo(({ cameraId, cameraName, onClose }: Count
           )}
         </div>
 
-        <div className="px-3 py-2.5 border-t border-foreground/10 flex items-center justify-between gap-2">
+        <div className="px-4 py-3 border-t border-slate-800 flex items-center justify-between gap-2 bg-slate-900/40">
           <button
             onClick={resetToDefault}
             disabled={saving || !loaded || (usingDefault && lines.length === 0)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-foreground/5 hover:bg-foreground/15 text-foreground/70 hover:text-white border border-foreground/10 transition-colors disabled:opacity-40"
-            title="Remove custom lines and restore the default entry line"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold uppercase tracking-wider bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 transition-colors disabled:opacity-40"
+            title="Reset to default line"
           >
             <RotateCcw className="w-3 h-3" /> Default
           </button>
           <button
             onClick={onClose}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-cyan-500/90 hover:bg-cyan-400 text-slate-950 transition-colors shadow-[0_0_12px_rgba(34,211,238,0.4)]"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-[11px] font-extrabold uppercase tracking-wider bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition-all shadow-[0_0_12px_rgba(34,211,238,0.4)]"
           >
-            <Check className="w-3 h-3" /> Done
+            <Check className="w-3.5 h-3.5" /> Done
           </button>
         </div>
 
         {saving && (
-          <div className="absolute inset-x-0 bottom-0 h-0.5 bg-cyan-400/80 animate-pulse" />
+          <div className="absolute inset-x-0 bottom-0 h-1 bg-cyan-400 animate-pulse" />
         )}
       </div>
     </div>

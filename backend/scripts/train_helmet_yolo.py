@@ -23,7 +23,12 @@ BEFORE RUNNING:
 
 USAGE:
     python train_helmet_yolo.py --epochs 100
-    python train_helmet_yolo.py --epochs 100 --model yolov8s.pt --device 0
+    python train_helmet_yolo.py --epochs 100 --model yolo11s.pt --device 0
+
+Recommended base models:
+  yolo11n.pt  — default, fast (5.4 MB, +2% mAP vs yolov8n)
+  yolo11s.pt  — better accuracy with GPU
+  yolov10n.pt — NMS-free option
 
 WHAT TO EXPECT: with ~3900 images (the full Hard Hat Workers dataset) this
 should comfortably beat the 79%-accuracy crop classifier, and — unlike that
@@ -42,8 +47,14 @@ def main():
     parser = argparse.ArgumentParser(description="Train YOLO helmet/no-helmet detector")
     parser.add_argument("--data-yaml", type=str, default="./helmet_dataset/data.yaml",
                          help="Path to the YOLO-format data.yaml (from convert_helmet_dataset.py)")
-    parser.add_argument("--model", type=str, default="yolov8n.pt",
-                         help="Base checkpoint to fine-tune from (yolov8n/s/m, or yolo11n/s/m)")
+    parser.add_argument(
+        "--model", type=str, default=None,
+        help=(
+            "Base model. Default: auto (yolo11s on GPU, yolo11n on CPU).\n"
+            "  GPU: yolo11s.pt (recommended), yolo11m.pt, yolov8s.pt\n"
+            "  CPU: yolo11n.pt, yolov8n.pt"
+        )
+    )
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument("--batch", type=int, default=16)
@@ -63,10 +74,16 @@ def main():
 
     device = args.device
     if device is not None and device != "cpu" and not torch.cuda.is_available():
-        print(f"WARNING: Device '{device}' requested, but CUDA is not available in PyTorch. Auto-falling back to CPU.")
+        print(f"WARNING: Device '{device}' requested, but CUDA is not available. Falling back to CPU.")
         device = "cpu"
 
-    model = YOLO(args.model)
+    # Auto-select model based on GPU availability
+    model_name = args.model
+    if model_name is None:
+        model_name = "yolo11s.pt" if torch.cuda.is_available() else "yolo11n.pt"
+        print(f"Auto-selected base model: {model_name} (GPU: {torch.cuda.is_available()})")
+
+    model = YOLO(model_name)
     kwargs = dict(
         data=str(data_yaml),
         epochs=args.epochs,

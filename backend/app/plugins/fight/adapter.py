@@ -69,7 +69,7 @@ FRAME_BUFFER_SIZE = 20
 # Score thresholds for the ML second-opinion. Deliberately conservative
 # (wide "unsure" middle band) until validated on real footage — see the
 # module docstring above.
-FIGHT_CONFIRM_THRESHOLD = 0.6
+FIGHT_CONFIRM_THRESHOLD = 0.55   # was 0.60 — slightly more weight to ML agreement
 FIGHT_VETO_THRESHOLD = 0.2
 
 _classifier = None
@@ -87,9 +87,16 @@ def _get_classifier():
         return _classifier
     try:
         from app.plugins.fight.ml_classifier import FightMLClassifier
-        _classifier = FightMLClassifier()
+        # Pass GPU device so classifier can use CUDA when available
+        try:
+            from gpu_utils import get_device
+            device = get_device()
+        except Exception:
+            device = "cpu"
+        _classifier = FightMLClassifier(device=device) if device != "cpu" else FightMLClassifier()
         logger.info(
-            f"Fight ML classifier loaded (test_accuracy={_classifier.test_accuracy})"
+            f"Fight ML classifier loaded on {device} "
+            f"(test_accuracy={_classifier.test_accuracy})"
         )
     except Exception as exc:
         _classifier_load_failed = True

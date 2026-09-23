@@ -1,24 +1,23 @@
 """
-YOLOv8-based fire and smoke detector.
+YOLO-based fire and smoke detector.
 
-Why a separate file: keeps YOLO model lifecycle (load, warm, infer) isolated
-from the CV2 pixel analysis in detector.py. Same single-responsibility design.
-The existing FrameAnalyzer (HSV + flicker) is the secondary method; this is
-the primary signal.
+Model strategy (in order of preference at runtime):
+  1. backend/runs_fire/train/weights/best.pt  — your own fine-tuned weights
+     (produced by train_fire_dataset.py; base model: yolo11n or yolo11s)
+  2. backend/app/plugins/fire/fire_yolo.pt    — drop any fire YOLO .pt here
+  3. backend/app/plugins/fire/fire_yolo_cached.pt — auto-download cache
+  4. Auto-download yolov11-fire best.pt from GitHub (spacewalk01 model)
+  5. Roboflow Serverless API fallback (if ROBOFLOW_API_KEY is set)
+
+YOLO version guide:
+  YOLO11n  — default base for fine-tuning (5.4 MB, +2% mAP vs v8n)
+  YOLO11s  — recommended for GPU deployment (better accuracy, fast with FP16)
+  YOLOv10n — NMS-free, lowest latency on TensorRT (set USE_YOLOV10=true)
 
 Why not in DeepStream's primary inference (PGIE): the PGIE trunk is shared
 across every camera and plugin. Swapping it to a fire model breaks PPE, ANPR,
 intrusion, and people counting. Running YOLO here means it only executes for
 cameras that have FireDetectionPlugin enabled.
-
-Model strategy (in order of preference):
-  1. backend/app/plugins/fire/fire_yolo.pt  — drop any fire YOLO .pt here
-  2. Auto-download yolov8s-fire.pt from GitHub (spacewalk01 fire detection model)
-  3. Fall back to the project's existing yolo11n.pt with fire-class heuristics
-
-The spacewalk01 model has 2 classes: fire (0), smoke (1).
-If falling back to yolo11n.pt (COCO), class 76 = scissors is ignored and
-we use the HSV layer exclusively in that case.
 """
 
 import os
@@ -28,7 +27,8 @@ from loguru import logger
 
 from app.plugins.fire.detector import Candidate, FIRE, SMOKE
 
-# Path to the primary trained fire YOLO model (best.pt)
+# Path to the primary trained fire YOLO model (produced by train_fire_dataset.py).
+# Base model for training: yolo11n.pt or yolo11s.pt (set via --model flag).
 _BEST_TRAINED_MODEL_PATH = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..", "runs_fire", "train", "weights", "best.pt")
 )
@@ -39,8 +39,8 @@ _LOCAL_MODEL_PATH = os.path.join(os.path.dirname(__file__), "fire_yolo.pt")
 # Auto-download destination — written once, reused on every restart.
 _CACHED_MODEL_PATH = os.path.join(os.path.dirname(__file__), "fire_yolo_cached.pt")
 
-# Public fire+smoke YOLOv8 model (spacewalk01, GitHub releases).
-# 2 classes: fire=0, smoke=1. ~22 MB.
+# Public fire+smoke YOLO11 model (spacewalk01, GitHub releases).
+# 2 classes: fire=0, smoke=1.
 _DOWNLOAD_URL = (
     "https://github.com/spacewalk01/yolov11-fire-detection"
     "/releases/download/v1.0/best.pt"
@@ -50,27 +50,35 @@ _DOWNLOAD_URL = (
 _CLASS_FIRE  = "fire"
 _CLASS_SMOKE = "smoke"
 
-# Minimum YOLO confidence to create a Candidate. Kept as the model's overall
-# conf= floor (passed to ultralytics) so we don't miss smoke boxes below it.
-_CONFIDENCE_THRESHOLD = 0.25
-
-# Smoke is visually softer/lower-contrast than fire (a diffuse, unsaturated
-# veil vs. a bright, saturated flame), so it consistently scores lower at the
-# same real-world certainty. Giving it its own, slightly lower floor — while
-# leaving fire's threshold untouched — recovers genuine smoke that was being
-# silently dropped at the shared 0.25 cutoff, without loosening fire's bar
-# (which would raise fire false positives).
-_SMOKE_CONFIDENCE_THRESHOLD = 0.18
+# Calibrated confidence thresholds for live camera feeds
+_CONFIDENCE_THRESHOLD = 0.45
+_SMOKE_CONFIDENCE_THRESHOLD = 0.35
 
 # Roboflow default model configuration
 _DEFAULT_ROBOFLOW_MODEL = "fire-detection-for-khkt/3"
+
+# Device for local inference (resolved once at import time via gpu_utils)
+try:
+    from gpu_utils import get_device, get_fp16_enabled
+    _INFER_DEVICE = get_device()
+    _USE_FP16 = get_fp16_enabled()
+except Exception:
+    _INFER_DEVICE = "cpu"
+    _USE_FP16 = False
+
+# YOLOv10 NMS-free mode — set USE_YOLOV10=true in .env for lowest latency
+# on TensorRT GPU deployments. Requires: pip install ultralytics>=8.3
+# YOLOv10 uses end-to-end inference (no NMS post-processing step) which
+# reduces per-frame latency by ~5-10ms on GPU.
+_USE_YOLOV10 = os.getenv("USE_YOLOV10", "false").lower() in ("true", "1", "yes")
 
 
 class YoloFireDetector:
     """
     Fire/smoke detector supporting:
       1. Roboflow Serverless API (if ROBOFLOW_API_KEY is set)
-      2. Local Ultralytics PyTorch YOLO model (using backend/runs_fire/train/weights/best.pt)
+      2. Local YOLO model — YOLO11n/YOLO11s (recommended) or YOLOv10n (NMS-free)
+         Base model used for training: yolo11n.pt (set USE_YOLOV10=true for v10)
       3. Graceful fallback to CV2 HSV frame analyzer
     """
 
@@ -145,7 +153,25 @@ class YoloFireDetector:
             return
 
         try:
-            self._model = YOLO(model_path)
+            # YOLOv10 NMS-free mode (USE_YOLOV10=true in .env)
+            if _USE_YOLOV10:
+                try:
+                    from ultralytics import YOLOv10  # noqa: PLC0415
+                    logger.info(
+                        "YoloFireDetector: YOLOv10 NMS-free mode enabled — "
+                        "no post-processing NMS step, lower latency on TensorRT"
+                    )
+                    ModelClass = YOLOv10
+                except ImportError:
+                    logger.warning(
+                        "YoloFireDetector: USE_YOLOV10=true but YOLOv10 class not found — "
+                        "falling back to YOLO (upgrade ultralytics: pip install -U ultralytics)"
+                    )
+                    ModelClass = YOLO
+            else:
+                ModelClass = YOLO  # YOLO11n/YOLO11s (default)
+
+            self._model = ModelClass(model_path)
             raw_names = self._model.names or {}
             names = [str(n).lower() for n in raw_names.values()]
             
@@ -160,11 +186,30 @@ class YoloFireDetector:
                 self._available = False
                 return
 
+            # Move model to the best available device (GPU/CPU)
+            try:
+                self._model.to(_INFER_DEVICE)
+                if _USE_FP16 and _INFER_DEVICE != "cpu":
+                    self._model.half()  # FP16 for ~2x GPU throughput
+                    logger.info(
+                        f"YoloFireDetector: inference on {_INFER_DEVICE} with FP16 enabled"
+                    )
+                else:
+                    logger.info(
+                        f"YoloFireDetector: inference on {_INFER_DEVICE} (FP32)"
+                    )
+            except Exception as dev_exc:
+                logger.warning(
+                    f"YoloFireDetector: could not move model to {_INFER_DEVICE} — {dev_exc}; "
+                    "falling back to CPU"
+                )
+
             self._model_has_fire_classes = any(
                 n in (_CLASS_FIRE, _CLASS_SMOKE) or "fire" in n or "smoke" in n
                 for n in names
             )
             if self._model_has_fire_classes:
+                arch = "YOLOv10 (NMS-free)" if _USE_YOLOV10 else "YOLO11"
                 # Format required startup log block
                 class_mapping_txt = "\n".join(
                     f"{cid} -> {cname}" for cid, cname in raw_names.items()
@@ -173,7 +218,9 @@ class YoloFireDetector:
                     "\n========================================\n"
                     "FIRE MODEL INITIALIZATION\n"
                     "========================================\n\n"
+                    f"Architecture:\n{arch}\n\n"
                     f"Model:\n{model_path}\n\n"
+                    f"Device:\n{_INFER_DEVICE} (FP16={_USE_FP16})\n\n"
                     f"Classes:\n{class_mapping_txt}\n\n"
                     "Model loaded successfully: TRUE\n"
                     "========================================"
@@ -193,13 +240,16 @@ class YoloFireDetector:
     def _resolve_model_path(self) -> str:
         """
         Returns the path of the best available local model, or None.
+        Priority: fine-tuned best.pt (YOLO11) > fire_yolo.pt > cached download
         """
         if os.path.exists(_BEST_TRAINED_MODEL_PATH):
-            logger.info(f"YoloFireDetector: using primary trained model {_BEST_TRAINED_MODEL_PATH}")
+            logger.info(
+                f"YoloFireDetector: using fine-tuned YOLO11 model: {_BEST_TRAINED_MODEL_PATH}"
+            )
             return _BEST_TRAINED_MODEL_PATH
 
         if os.path.exists(_LOCAL_MODEL_PATH):
-            logger.info(f"YoloFireDetector: using local model {_LOCAL_MODEL_PATH}")
+            logger.info(f"YoloFireDetector: using local model: {_LOCAL_MODEL_PATH}")
             return _LOCAL_MODEL_PATH
 
         if os.path.exists(_CACHED_MODEL_PATH):
@@ -359,7 +409,11 @@ class YoloFireDetector:
         # isn't discarded by ultralytics before we get a chance to apply
         # smoke's own (lower) threshold below.
         run_conf = min(_CONFIDENCE_THRESHOLD, _SMOKE_CONFIDENCE_THRESHOLD)
-        results = self._model(frame, verbose=False, conf=run_conf)
+        results = self._model(
+            frame, verbose=False, conf=run_conf,
+            device=_INFER_DEVICE,
+            half=(_USE_FP16 and _INFER_DEVICE != "cpu"),
+        )
         if not results:
             return []
 
@@ -379,12 +433,18 @@ class YoloFireDetector:
                 # Exact name match is safer than substring for this 4-class model.
                 is_fire = ("fire" in cls_name and cls_name != "no-fire") or "flame" in cls_name
                 is_smoke = "smoke" in cls_name
-                if not (is_fire or is_smoke):
+                is_person = "person" in cls_name
+                if not (is_fire or is_smoke or is_person):
                     continue
 
-                # Per-class floor: fire keeps its original bar, smoke gets
-                # its own lower one (see _SMOKE_CONFIDENCE_THRESHOLD above).
-                min_conf = _SMOKE_CONFIDENCE_THRESHOLD if is_smoke else _CONFIDENCE_THRESHOLD
+                # Thresholds
+                if is_person:
+                    min_conf = 0.35
+                elif is_smoke:
+                    min_conf = _SMOKE_CONFIDENCE_THRESHOLD
+                else:
+                    min_conf = _CONFIDENCE_THRESHOLD
+
                 if conf < min_conf:
                     continue
 
@@ -392,14 +452,29 @@ class YoloFireDetector:
                 x1, y1 = max(0, x1), max(0, y1)
                 x2, y2 = min(w, x2), min(h, y2)
 
+                # Flame color confirmation to eliminate non-fire false positives on room objects
+                if is_fire:
+                    crop = frame[y1:y2, x1:x2]
+                    if crop.size > 0:
+                        import cv2
+                        import numpy as np
+                        hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+                        mask1 = cv2.inRange(hsv, (0, 50, 70), (35, 255, 255))
+                        mask2 = cv2.inRange(hsv, (155, 50, 70), (180, 255, 255))
+                        flame_pixels = int(np.count_nonzero(mask1) + np.count_nonzero(mask2))
+                        if flame_pixels < max(12, int(0.015 * crop.shape[0] * crop.shape[1])):
+                            # Reject false alarm
+                            continue
+
                 box_area = max(0.0, float((x2 - x1) * (y2 - y1)))
                 area_frac = box_area / frame_area
-                kind = FIRE if is_fire else SMOKE
-                logger.debug(
-                    f"YoloFireDetector: {kind} detected cls={cls_name!r} "
-                    f"conf={conf:.2f} area_frac={area_frac:.4f} "
-                    f"bbox=[{x1},{y1},{x2},{y2}]"
-                )
+                if is_fire:
+                    kind = FIRE
+                elif is_smoke:
+                    kind = SMOKE
+                else:
+                    kind = "person"
+
                 candidates.append(Candidate(
                     kind=kind,
                     bbox=[x1, y1, x2, y2],

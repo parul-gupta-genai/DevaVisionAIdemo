@@ -107,15 +107,6 @@ export const CameraCard = memo(({ id, name, location, pipelineStatus: parentPipe
     }
   }, [parentPipelineStatus, isToggling, lastToggleTime])
 
-  useEffect(() => {
-    // The editor overlay is gated on a running pipeline; without this reset a
-    // click while stopped leaves the flag set and the full-card editor pops
-    // open uninvited the moment the pipeline is started.
-    if (pipelineStatus === 'Stopped') {
-      setIsLineEditorOpen(false)
-      setIsZoneEditorOpen(false)
-    }
-  }, [pipelineStatus])
 
   const togglePipeline = async (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -241,26 +232,22 @@ export const CameraCard = memo(({ id, name, location, pipelineStatus: parentPipe
               <Zap className="w-3 h-3 fill-current" />
               Analytics
             </button>
-            {pipelineStatus !== 'Stopped' && (
-              <button
-                onClick={(e) => { e.stopPropagation(); setIsZoneEditorOpen(true); }}
-                className="px-2 py-1.5 bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/30 rounded backdrop-blur transition-colors flex items-center gap-1.5 text-[10px] font-bold shadow-[0_0_10px_rgba(245,158,11,0.2)] uppercase tracking-widest pointer-events-auto"
-                title="Draw restricted zones on the live video"
-              >
-                <Shapes className="w-3 h-3" />
-                Zones
-              </button>
-            )}
-            {isCountingEnabled && pipelineStatus !== 'Stopped' && (
-              <button
-                onClick={(e) => { e.stopPropagation(); setIsLineEditorOpen(true); }}
-                className="px-2 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-300 border border-cyan-500/30 rounded backdrop-blur transition-colors flex items-center gap-1.5 text-[10px] font-bold shadow-[0_0_10px_rgba(34,211,238,0.2)] uppercase tracking-widest pointer-events-auto"
-                title="Draw people counting lines on the live video"
-              >
-                <Crosshair className="w-3 h-3" />
-                Lines
-              </button>
-            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); setIsZoneEditorOpen(true); }}
+              className="px-2 py-1.5 bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/30 rounded backdrop-blur transition-colors flex items-center gap-1.5 text-[10px] font-bold shadow-[0_0_10px_rgba(245,158,11,0.2)] uppercase tracking-widest pointer-events-auto"
+              title="Draw restricted area zones (any shape / multi-corner polygon / ROI)"
+            >
+              <Shapes className="w-3 h-3" />
+              Zones (ROI)
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setIsLineEditorOpen(true); }}
+              className="px-2 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-300 border border-cyan-500/30 rounded backdrop-blur transition-colors flex items-center gap-1.5 text-[10px] font-bold shadow-[0_0_10px_rgba(34,211,238,0.2)] uppercase tracking-widest pointer-events-auto"
+              title="Draw tripwire counting lines (roadway/entry/exit lines)"
+            >
+              <Crosshair className="w-3 h-3" />
+              Lines (Tripwire)
+            </button>
             {onEdit && (
               <button
                 onClick={(e) => { e.stopPropagation(); onEdit(); }}
@@ -515,7 +502,7 @@ export const CameraCard = memo(({ id, name, location, pipelineStatus: parentPipe
         ))}
       </motion.div>
 
-      {isLineEditorOpen && pipelineStatus !== 'Stopped' && (
+      {isLineEditorOpen && (
         <CountingLineEditor
           cameraId={id}
           cameraName={name}
@@ -523,7 +510,7 @@ export const CameraCard = memo(({ id, name, location, pipelineStatus: parentPipe
         />
       )}
 
-      {isZoneEditorOpen && pipelineStatus !== 'Stopped' && (
+      {isZoneEditorOpen && (
         <RestrictedZoneEditor
           cameraId={id}
           cameraName={name}

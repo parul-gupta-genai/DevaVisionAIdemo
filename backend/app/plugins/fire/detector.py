@@ -71,8 +71,9 @@ WORK_WIDTH = 320
 # resolution independent.
 MIN_FIRE_AREA_FRAC = 0.001
 # Smoke plumes are diffuse, and a small grey patch is noise, so smoke keeps a
-# larger floor than fire.
-MIN_SMOKE_AREA_FRAC = 60000.0 / (1280.0 * 720.0)
+# larger floor than fire. Expressed as a true resolution-independent fraction
+# (was a hardcoded pixel count for 1280x720 only).
+MIN_SMOKE_AREA_FRAC = 0.065  # ~6.5% of frame area at any resolution
 
 # Fire HSV ranges:
 # 1. Yellow-Orange flame: Hue 0-35, Sat >= 50, Val >= 120
@@ -96,10 +97,14 @@ SMOKE_MAX_VAL = 235
 SMOKE_MIN_DELTA = 10
 # Smoke veils texture, so gradient energy must FALL by at least this fraction
 # of the background's own energy where it lands.
-SMOKE_EDGE_LOSS = 0.15
+# Lowered 0.15→0.10: catches lighter/early-stage smoke without false-positives,
+# because the moved+greyish gates still filter out non-smoke regions.
+SMOKE_EDGE_LOSS = 0.10
 
 # Frames of quiet observation before smoke can be reported at all.
-BG_WARMUP_FRAMES = 5
+# Reduced 5→3: faster startup detection on live cameras without meaningfully
+# increasing false positives (the edge-veiling test still filters noise).
+BG_WARMUP_FRAMES = 3
 BG_ALPHA = 0.05             # background learns slowly; smoke must not vanish
 
 # Score a fire region must reach to be worth a service-layer candidate.

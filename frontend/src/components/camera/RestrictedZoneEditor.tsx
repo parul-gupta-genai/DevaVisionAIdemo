@@ -365,83 +365,83 @@ export const RestrictedZoneEditor = memo(({ cameraId, cameraName, onClose }: Pro
         onMouseLeave={() => setCursor(null)}
       />
 
-      <div className="absolute top-3 left-3 w-80 max-w-[88%] bg-slate-950/85 backdrop-blur-md border border-amber-500/30 rounded-xl shadow-2xl overflow-hidden pointer-events-auto">
-        <div className="px-3 py-2.5 flex items-center justify-between border-b border-foreground/10 bg-amber-500/10">
-          <div className="flex items-center gap-2 text-amber-300">
-            <Shapes className="w-4 h-4" />
-            <span className="text-xs font-bold uppercase tracking-widest">Restricted Zones</span>
+      <div className="absolute top-3 left-3 w-84 max-w-[92%] bg-slate-950/95 backdrop-blur-xl border border-amber-500/50 rounded-2xl shadow-2xl overflow-hidden pointer-events-auto ring-1 ring-amber-500/20">
+        <div className="px-4 py-3 flex items-center justify-between border-b border-amber-500/20 bg-amber-500/15">
+          <div className="flex items-center gap-2 text-amber-300 font-bold">
+            <Shapes className="w-4 h-4 text-amber-400" />
+            <span className="text-xs uppercase tracking-wider font-extrabold text-white">Restricted Zones (ROI)</span>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded hover:bg-foreground/10 text-foreground/60 hover:text-white transition-colors"
+            className="p-1.5 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
             title="Close editor"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="px-3 py-2 text-[11px] leading-relaxed text-foreground/70">
-          Click each corner of the area, then click the first corner again to close it.
-          <span className="block mt-0.5 text-foreground/45">
-            Esc clears the shape · Backspace removes the last corner · Enter saves.
+        <div className="px-4 py-3 text-xs leading-relaxed text-slate-100 bg-slate-900/60 border-b border-slate-800">
+          <p className="font-semibold text-white">Click each corner of the area, then click the first corner to close it.</p>
+          <span className="block mt-1.5 text-[11px] text-amber-300 font-medium bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20">
+            ⌨️ Esc: Clear · Backspace: Undo · Enter: Save
           </span>
-          {cameraName ? <span className="block mt-1 text-foreground/40">Camera: {cameraName}</span> : null}
+          {cameraName ? <span className="block mt-1.5 text-[11px] text-cyan-300 font-medium">📷 Camera: {cameraName}</span> : null}
         </div>
 
         {draft.length > 0 && (
-          <div className="px-3 pb-2 space-y-2">
+          <div className="px-4 py-3 space-y-2.5 bg-slate-900/80 border-b border-slate-800">
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder={`Zone ${zones.length + 1} — e.g. Switchyard`}
-              className="w-full px-2 py-1.5 rounded-lg bg-foreground/5 border border-foreground/15 text-[11px] text-white placeholder:text-foreground/30 focus:outline-none focus:border-amber-400/60"
+              placeholder={`Zone Name (e.g. Loading Bay, Hazardous Area)`}
+              className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-amber-400/50 text-xs font-semibold text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400/50"
             />
             <div className="flex items-center gap-2">
               <button
                 onClick={save}
                 disabled={!draftUsable || saving}
-                className="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-amber-500/90 hover:bg-amber-400 text-slate-950 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-extrabold uppercase tracking-wider bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all shadow-[0_0_15px_rgba(245,158,11,0.4)] disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                <Check className="w-3 h-3" />
+                <Check className="w-3.5 h-3.5" />
                 {draft.length < 3
                   ? `${3 - draft.length} more corner${draft.length === 2 ? '' : 's'}`
-                  : !draftUsable ? 'Too small' : 'Save zone'}
+                  : !draftUsable ? 'Too small' : 'Save Zone'}
               </button>
               <button
                 onClick={() => setDraft(draft.slice(0, -1))}
-                className="p-1.5 rounded-lg bg-foreground/5 hover:bg-foreground/15 text-foreground/70 border border-foreground/10 transition-colors"
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors"
                 title="Undo last corner"
               >
-                <Undo2 className="w-3.5 h-3.5" />
+                <Undo2 className="w-4 h-4" />
               </button>
             </div>
           </div>
         )}
 
-        <div className="px-3 pb-2 flex flex-col gap-1.5 max-h-44 overflow-y-auto">
+        <div className="px-4 py-3 flex flex-col gap-2 max-h-48 overflow-y-auto">
           {!loaded ? (
             loadFailed ? (
               <button
                 onClick={load}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-danger/10 hover:bg-danger/20 text-danger border border-danger/30 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-danger/20 hover:bg-danger/30 text-danger border border-danger/40 transition-colors"
               >
-                <RefreshCw className="w-3 h-3" /> Failed to load zones — Retry
+                <RefreshCw className="w-3.5 h-3.5" /> Retry Loading Zones
               </button>
             ) : (
-              <div className="text-[11px] text-foreground/40 py-1">Loading…</div>
+              <div className="text-xs text-slate-300 py-1">Loading zones…</div>
             )
           ) : zones.length === 0 ? (
-            <div className="text-[11px] text-foreground/50 py-1 italic">
-              No zone on this camera — nothing is being monitored here. Draw one to start.
+            <div className="text-xs text-slate-300 py-2 italic font-medium bg-slate-900/40 p-2.5 rounded-xl border border-slate-800">
+              No zones drawn on this camera yet. Click on the video to start drawing any shape.
             </div>
           ) : (
             zones.map((zone) => (
               <div
                 key={zone.zone_id}
-                className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-foreground/5 border border-foreground/10 text-[11px] text-white"
+                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-750 text-xs text-white shadow-sm"
               >
                 <span
-                  className="w-2 h-2 rounded-full shrink-0"
+                  className="w-2.5 h-2.5 rounded-full shrink-0"
                   style={{
                     background: zone.is_active && zone.armed_now
                       ? SEVERITY_STROKE[zone.severity] || '#f59e0b'
@@ -449,9 +449,9 @@ export const RestrictedZoneEditor = memo(({ cameraId, cameraName, onClose }: Pro
                   }}
                 />
                 <div className="flex-1 min-w-0">
-                  <div className="truncate font-semibold">{zone.name}</div>
-                  <div className="truncate text-[9px] text-foreground/45 flex items-center gap-1">
-                    <Clock className="w-2.5 h-2.5" />
+                  <div className="truncate font-bold text-white text-xs">{zone.name}</div>
+                  <div className="truncate text-[10px] text-slate-300 flex items-center gap-1 mt-0.5">
+                    <Clock className="w-2.5 h-2.5 text-amber-400" />
                     {zone.is_active
                       ? (zone.armed_now ? `Armed · ${zone.schedule_text}` : `Off-schedule · ${zone.schedule_text}`)
                       : 'Disabled'}
@@ -460,15 +460,15 @@ export const RestrictedZoneEditor = memo(({ cameraId, cameraName, onClose }: Pro
                 <button
                   onClick={() => toggleActive(zone)}
                   disabled={saving}
-                  className="p-1 rounded hover:bg-foreground/15 text-foreground/60 transition-colors disabled:opacity-40"
+                  className="p-1.5 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition-colors disabled:opacity-40"
                   title={zone.is_active ? 'Disable this zone' : 'Enable this zone'}
                 >
-                  {zone.is_active ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                  {zone.is_active ? <Eye className="w-3.5 h-3.5 text-emerald-400" /> : <EyeOff className="w-3.5 h-3.5 text-slate-400" />}
                 </button>
                 <button
                   onClick={() => remove(zone)}
                   disabled={saving}
-                  className="p-1 rounded hover:bg-danger/20 text-danger transition-colors disabled:opacity-40"
+                  className="p-1.5 rounded-lg hover:bg-danger/20 text-danger transition-colors disabled:opacity-40"
                   title="Delete zone"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -478,22 +478,22 @@ export const RestrictedZoneEditor = memo(({ cameraId, cameraName, onClose }: Pro
           )}
         </div>
 
-        <div className="px-3 py-2.5 border-t border-foreground/10 flex items-center justify-between gap-2">
+        <div className="px-4 py-3 border-t border-slate-800 flex items-center justify-between gap-2 bg-slate-900/40">
           <a
             href="/restricted-zones"
-            className="text-[10px] font-bold uppercase tracking-wider text-amber-300/80 hover:text-amber-200 transition-colors"
+            className="text-[11px] font-bold uppercase tracking-wider text-amber-300 hover:text-amber-200 transition-colors"
           >
-            Rules &amp; schedule →
+            Rules &amp; Schedule →
           </a>
           <button
             onClick={onClose}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-amber-500/90 hover:bg-amber-400 text-slate-950 transition-colors shadow-[0_0_12px_rgba(245,158,11,0.35)]"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-[11px] font-extrabold uppercase tracking-wider bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all shadow-[0_0_12px_rgba(245,158,11,0.4)]"
           >
-            <Check className="w-3 h-3" /> Done
+            <Check className="w-3.5 h-3.5" /> Done
           </button>
         </div>
 
-        {saving && <div className="absolute inset-x-0 bottom-0 h-0.5 bg-amber-400/80 animate-pulse" />}
+        {saving && <div className="absolute inset-x-0 bottom-0 h-1 bg-amber-400 animate-pulse" />}
       </div>
     </div>
   )
