@@ -320,6 +320,13 @@ if BEST_PT.exists():
     print(f"Best model: {BEST_PT}")
     print(f"Size: {BEST_PT.stat().st_size / (1024*1024):.1f} MB")
 
+    # Copy to target plugin weights location for export & runtime
+    target_plugin_weights = Path(__file__).resolve().parent.parent / "app" / "plugins" / "fire" / "fire_yolo.pt"
+    target_plugin_weights.parent.mkdir(parents=True, exist_ok=True)
+    import shutil
+    shutil.copy2(BEST_PT, target_plugin_weights)
+    print(f"✅ Auto-deployed trained weights to plugin: {target_plugin_weights}")
+
     # Validate on test set
     val_model = YOLO(str(BEST_PT))
     metrics = val_model.val(data=DATA_YAML, device=0)
