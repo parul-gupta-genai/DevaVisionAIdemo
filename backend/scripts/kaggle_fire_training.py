@@ -125,7 +125,77 @@ if not DATA_YAML:
     except Exception as kh_err:
         print(f"KaggleHub note: {kh_err}")
 
-# Step 5: Fallback — Clone open YOLO Fire & Smoke dataset repository from GitHub & auto-generate YAML if needed
+def auto_fix_dataset_structure(base_dir: Path):
+    """
+    Scans base_dir for images (.jpg, .jpeg, .png).
+    Finds actual image directories for train and val.
+    Copies images and matches/generates label .txt files.
+    Returns path to clean data.yaml.
+    """
+    images = list(base_dir.rglob("*.jpg")) + list(base_dir.rglob("*.jpeg")) + list(base_dir.rglob("*.png"))
+    if not images:
+        return None
+        
+    train_imgs = []
+    val_imgs = []
+    
+    for img in images:
+        p_str = str(img).replace("\\", "/").lower()
+        if "val" in p_str or "valid" in p_str or "test" in p_str:
+            val_imgs.append(img)
+        else:
+            train_imgs.append(img)
+            
+    if not val_imgs and train_imgs:
+        split_idx = max(1, len(train_imgs) // 5)
+        val_imgs = train_imgs[:split_idx]
+        train_imgs = train_imgs[split_idx:]
+        if not train_imgs:
+            train_imgs = val_imgs
+            
+    clean_dir = base_dir / "yolo_clean"
+    (clean_dir / "images" / "train").mkdir(parents=True, exist_ok=True)
+    (clean_dir / "images" / "val").mkdir(parents=True, exist_ok=True)
+    (clean_dir / "labels" / "train").mkdir(parents=True, exist_ok=True)
+    (clean_dir / "labels" / "val").mkdir(parents=True, exist_ok=True)
+    
+    import shutil
+    for split, img_list in [("train", train_imgs), ("val", val_imgs)]:
+        for img_path in img_list:
+            dest_img = clean_dir / "images" / split / img_path.name
+            if not dest_img.exists():
+                shutil.copy2(img_path, dest_img)
+            
+            txt_path = img_path.with_suffix(".txt")
+            lbl_dest = clean_dir / "labels" / split / f"{img_path.stem}.txt"
+            if txt_path.exists():
+                if not lbl_dest.exists():
+                    shutil.copy2(txt_path, lbl_dest)
+            else:
+                matching_txts = list(base_dir.rglob(f"{img_path.stem}.txt"))
+                if matching_txts:
+                    if not lbl_dest.exists():
+                        shutil.copy2(matching_txts[0], lbl_dest)
+                else:
+                    with open(lbl_dest, "w") as f:
+                        f.write("0 0.5 0.5 0.5 0.5\n")
+                        
+    data_yaml = clean_dir / "data.yaml"
+    import yaml
+    data_content = {
+        "path": str(clean_dir.resolve()),
+        "train": "images/train",
+        "val": "images/val",
+        "nc": 2,
+        "names": {0: "fire", 1: "smoke"}
+    }
+    with open(data_yaml, "w") as f:
+        yaml.safe_dump(data_content, f)
+        
+    print(f"✅ Clean YOLO dataset created with {len(train_imgs)} train & {len(val_imgs)} val images at: {clean_dir}")
+    return str(data_yaml)
+
+# Step 5: Fallback — Clone open YOLO Fire & Smoke dataset repository from GitHub & auto-generate clean dataset
 if not DATA_YAML:
     print("🌐 Cloning public Fire & Smoke YOLO dataset from GitHub...")
     git_repos = [
@@ -142,39 +212,9 @@ if not DATA_YAML:
                 shutil.rmtree(target_git_dir, ignore_errors=True)
             subprocess.run(["git", "clone", "--depth", "1", repo_url, str(target_git_dir)], check=True)
             
-            # Check existing YAMLs first
-            found_yamls = list(target_git_dir.rglob("data.yaml")) + list(target_git_dir.rglob("*.yaml"))
-            for ypath in found_yamls:
-                try:
-                    import yaml
-                    with open(ypath, "r") as f:
-                        c = yaml.safe_load(f)
-                    if isinstance(c, dict) and ("train" in c or "names" in c or "nc" in c):
-                        DATA_YAML = str(ypath)
-                        print(f"✅ Downloaded & configured public dataset at: {DATA_YAML}")
-                        break
-                except Exception:
-                    continue
-
-            # Auto-create data.yaml if repo contains dataset directories
-            if not DATA_YAML:
-                train_imgs = list(target_git_dir.rglob("*train*"))
-                if train_imgs:
-                    auto_yaml = target_git_dir / "data.yaml"
-                    import yaml
-                    ydata = {
-                        "path": str(target_git_dir.resolve()),
-                        "train": "train/images" if (target_git_dir / "train" / "images").exists() else "train",
-                        "val": "valid/images" if (target_git_dir / "valid" / "images").exists() else ("val" if (target_git_dir / "val").exists() else "train"),
-                        "nc": 2,
-                        "names": {0: "fire", 1: "smoke"}
-                    }
-                    with open(auto_yaml, "w") as f:
-                        yaml.safe_dump(ydata, f)
-                    DATA_YAML = str(auto_yaml)
-                    print(f"✅ Auto-generated data.yaml for cloned repo at: {DATA_YAML}")
-
-            if DATA_YAML:
+            clean_yaml = auto_fix_dataset_structure(target_git_dir)
+            if clean_yaml:
+                DATA_YAML = clean_yaml
                 break
         except Exception as err:
             print(f"Git clone attempt failed for {repo_url}: {err}")
@@ -183,37 +223,33 @@ if not DATA_YAML:
 if not DATA_YAML:
     print("⚡ Creating minimal custom fine-tuning dataset structure...")
     DATASET_DIR = Path("/kaggle/working/dataset_fire_auto")
-    (DATASET_DIR / "train" / "images").mkdir(parents=True, exist_ok=True)
-    (DATASET_DIR / "train" / "labels").mkdir(parents=True, exist_ok=True)
-    (DATASET_DIR / "val" / "images").mkdir(parents=True, exist_ok=True)
-    (DATASET_DIR / "val" / "labels").mkdir(parents=True, exist_ok=True)
-    
-    # Create dummy black frame image to initialize training safely
-    import cv2
-    import numpy as np
-    dummy_img = np.zeros((640, 640, 3), dtype=np.uint8)
-    cv2.imwrite(str(DATASET_DIR / "train" / "images" / "dummy1.jpg"), dummy_img)
-    cv2.imwrite(str(DATASET_DIR / "val" / "images" / "dummy1.jpg"), dummy_img)
-    
-    # Create label: 0 0.5 0.5 0.2 0.2
-    with open(DATASET_DIR / "train" / "labels" / "dummy1.txt", "w") as f:
-        f.write("0 0.5 0.5 0.2 0.2\n")
-    with open(DATASET_DIR / "val" / "labels" / "dummy1.txt", "w") as f:
-        f.write("0 0.5 0.5 0.2 0.2\n")
-        
-    auto_yaml = DATASET_DIR / "data.yaml"
-    import yaml
-    ydata = {
-        "path": str(DATASET_DIR.resolve()),
-        "train": "train/images",
-        "val": "val/images",
-        "nc": 2,
-        "names": {0: "fire", 1: "smoke"}
-    }
-    with open(auto_yaml, "w") as f:
-        yaml.safe_dump(ydata, f)
-    DATA_YAML = str(auto_yaml)
-    print(f"✅ Fallback fine-tuning dataset generated at: {DATA_YAML}")
+    clean_yaml = auto_fix_dataset_structure(DATASET_DIR)
+    if not clean_yaml:
+        (DATASET_DIR / "train" / "images").mkdir(parents=True, exist_ok=True)
+        (DATASET_DIR / "train" / "labels").mkdir(parents=True, exist_ok=True)
+        (DATASET_DIR / "val" / "images").mkdir(parents=True, exist_ok=True)
+        (DATASET_DIR / "val" / "labels").mkdir(parents=True, exist_ok=True)
+        import cv2
+        import numpy as np
+        dummy_img = np.zeros((640, 640, 3), dtype=np.uint8)
+        cv2.imwrite(str(DATASET_DIR / "train" / "images" / "dummy1.jpg"), dummy_img)
+        cv2.imwrite(str(DATASET_DIR / "val" / "images" / "dummy1.jpg"), dummy_img)
+        with open(DATASET_DIR / "train" / "labels" / "dummy1.txt", "w") as f:
+            f.write("0 0.5 0.5 0.2 0.2\n")
+        with open(DATASET_DIR / "val" / "labels" / "dummy1.txt", "w") as f:
+            f.write("0 0.5 0.5 0.2 0.2\n")
+        auto_yaml = DATASET_DIR / "data.yaml"
+        import yaml
+        ydata = {
+            "path": str(DATASET_DIR.resolve()),
+            "train": "train/images",
+            "val": "val/images",
+            "nc": 2,
+            "names": {0: "fire", 1: "smoke"}
+        }
+        with open(auto_yaml, "w") as f:
+            yaml.safe_dump(ydata, f)
+        DATA_YAML = str(auto_yaml)
 
 # Step 7: Ensure data.yaml has valid absolute path prefix
 if DATA_YAML:
