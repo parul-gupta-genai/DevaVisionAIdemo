@@ -335,6 +335,7 @@ app.include_router(command_center_router)
 
 # Auth and config routes
 app.include_router(auth_router)
+app.include_router(auth_router, prefix="/api")
 app.include_router(admin_router)
 app.include_router(config_router)
 app.include_router(alerts_router)

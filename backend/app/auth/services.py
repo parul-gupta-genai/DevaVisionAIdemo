@@ -1,17 +1,14 @@
 import secrets
 from datetime import datetime, timedelta
 from fastapi import HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
+from sqlalchemy.orm import Session
 
 from database.models.auth import User, RefreshToken, AuditLog
 from app.auth.schemas import LoginRequest, Token
 from app.auth.security import verify_password, create_access_token
 
-async def authenticate_user(db: AsyncSession, login_data: LoginRequest) -> Token:
-    stmt = select(User).where(User.email == login_data.email)
-    result = await db.execute(stmt)
-    user = result.scalars().first()
+def authenticate_user(db: Session, login_data: LoginRequest) -> Token:
+    user = db.query(User).filter(User.email == login_data.email).first()
 
     if not user:
         # Prevent timing attacks by still running a verification
@@ -29,10 +26,10 @@ async def authenticate_user(db: AsyncSession, login_data: LoginRequest) -> Token
         )
 
     if not verify_password(login_data.password, user.hashed_password):
-        user.failed_login_attempts += 1
+        user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
         if user.failed_login_attempts >= 5:
             user.locked_until = datetime.utcnow() + timedelta(minutes=15)
-        await db.commit()
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
@@ -45,7 +42,7 @@ async def authenticate_user(db: AsyncSession, login_data: LoginRequest) -> Token
     # Generate Tokens
     access_token = create_access_token(
         subject=user.id, 
-        scopes=["admin"] if user.is_superuser else [] # Will expand in routes
+        scopes=["admin"] if user.is_superuser else []
     )
     
     refresh_token_str = secrets.token_urlsafe(32)
@@ -61,7 +58,7 @@ async def authenticate_user(db: AsyncSession, login_data: LoginRequest) -> Token
     log = AuditLog(user_id=user.id, action="LOGIN", ip_address="Unknown")
     db.add(log)
     
-    await db.commit()
+    db.commit()
     
     return Token(
         access_token=access_token,
@@ -69,13 +66,11 @@ async def authenticate_user(db: AsyncSession, login_data: LoginRequest) -> Token
         token_type="bearer"
     )
 
-async def refresh_access_token(db: AsyncSession, refresh_token_str: str) -> Token:
-    stmt = select(RefreshToken).where(
+def refresh_access_token(db: Session, refresh_token_str: str) -> Token:
+    token_obj = db.query(RefreshToken).filter(
         RefreshToken.token == refresh_token_str,
         RefreshToken.is_revoked == False
-    )
-    result = await db.execute(stmt)
-    token_obj = result.scalars().first()
+    ).first()
     
     if not token_obj or token_obj.expires_at < datetime.utcnow():
         raise HTTPException(
@@ -83,10 +78,7 @@ async def refresh_access_token(db: AsyncSession, refresh_token_str: str) -> Toke
             detail="Invalid or expired refresh token"
         )
         
-    # Get user to issue new access token
-    stmt_user = select(User).where(User.id == token_obj.user_id)
-    res_user = await db.execute(stmt_user)
-    user = res_user.scalars().first()
+    user = db.query(User).filter(User.id == token_obj.user_id).first()
     
     access_token = create_access_token(
         subject=user.id, 
@@ -95,20 +87,16 @@ async def refresh_access_token(db: AsyncSession, refresh_token_str: str) -> Toke
     
     return Token(
         access_token=access_token,
-        refresh_token=refresh_token_str, # Could rotate here if desired
+        refresh_token=refresh_token_str,
         token_type="bearer"
     )
 
-async def logout_user(db: AsyncSession, refresh_token_str: str):
-    stmt = select(RefreshToken).where(RefreshToken.token == refresh_token_str)
-    result = await db.execute(stmt)
-    token_obj = result.scalars().first()
+def logout_user(db: Session, refresh_token_str: str):
+    token_obj = db.query(RefreshToken).filter(RefreshToken.token == refresh_token_str).first()
     
     if token_obj:
         token_obj.is_revoked = True
-        
-        # Log it
         log = AuditLog(user_id=token_obj.user_id, action="LOGOUT")
         db.add(log)
-        
-        await db.commit()
+        db.commit()
+
