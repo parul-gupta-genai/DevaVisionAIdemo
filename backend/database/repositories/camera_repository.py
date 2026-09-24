@@ -8,6 +8,9 @@ class CameraRepository:
         
     def get_active_cameras(self) -> List[Camera]:
         return self.db.query(Camera).filter(Camera.active == True).all()
+
+    def get_all(self) -> List[Camera]:
+        return self.db.query(Camera).all()
         
     def get_by_url(self, rtsp_url: str) -> Optional[Camera]:
         return self.db.query(Camera).filter(Camera.rtsp_url == rtsp_url).first()

@@ -67,6 +67,29 @@ def needs_ffmpeg_relay(source: str, source_type: str) -> bool:
     return not source.startswith(('rtsp://', 'rtsps://', 'http://', 'https://'))
 
 
+@router.get("")
+@router.get("/")
+def get_cameras():
+    db = SessionLocal()
+    try:
+        repo = CameraRepository(db)
+        cameras = repo.get_all()
+        result = []
+        for cam in cameras:
+            result.append({
+                "id": cam.id,
+                "name": cam.name,
+                "rtsp_url": getattr(cam, 'rtsp_url', None) or getattr(cam, 'source', None),
+                "source": getattr(cam, 'source', None) or getattr(cam, 'rtsp_url', None),
+                "source_type": getattr(cam, 'source_type', 'rtsp'),
+                "state": getattr(cam, 'state', 'STOPPED'),
+                "edge_id": getattr(cam, 'edge_id', 'edge-01'),
+                "active": getattr(cam, 'active', True)
+            })
+        return {"status": "success", "cameras": result}
+    finally:
+        db.close()
+
 @router.post("")
 def post_camera(camera: CameraInfo, background_tasks: BackgroundTasks):
     import uuid
