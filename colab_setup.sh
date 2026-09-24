@@ -95,7 +95,7 @@ if [ ! -f "/usr/local/bin/cloudflared" ]; then
 fi
 
 pkill -f "cloudflared" || true
-nohup /usr/local/bin/cloudflared tunnel --url http://localhost:8000 > /content/tunnel.log 2>&1 &
+nohup /usr/local/bin/cloudflared tunnel --url http://127.0.0.1:8000 > /content/tunnel.log 2>&1 &
 
 
 echo "========================================================="
