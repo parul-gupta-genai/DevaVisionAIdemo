@@ -9,4 +9,4 @@ snapshots/
 __pycache__/
 *.mov
 *.task
-models/
+!database/models/
