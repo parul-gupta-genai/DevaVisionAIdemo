@@ -34,7 +34,11 @@ function CameraStatusList() {
     const fetchStatus = async () => {
       try {
         const res = await api.get('/api/cameras/status')
-        if (res.data) setStatuses(res.data)
+        if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
+          setStatuses(res.data)
+        } else {
+          setStatuses({})
+        }
       } catch (e) {
         console.error(e)
       }
