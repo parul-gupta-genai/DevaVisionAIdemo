@@ -31,7 +31,7 @@ class DatabaseWorker:
         self.flush_interval = 1.0  # Force a DB write every 1 second minimum (optimized)
         self.prune_interval = 3600.0 # Prune old records every hour
         
-        self.alert_engine = AlertEngine()
+        self.alert_engine = AlertEngine() if AlertEngine is not None else None
         
         from core.events.bus import RedisEventBus
         from config.config import config
