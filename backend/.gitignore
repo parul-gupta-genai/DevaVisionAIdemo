@@ -6,6 +6,7 @@ node_modules/
 snapshots/
 *.log
 *.txt
+!requirements.txt
 __pycache__/
 *.mov
 *.task

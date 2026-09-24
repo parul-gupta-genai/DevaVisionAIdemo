@@ -77,7 +77,7 @@ export DATABASE_URL="postgresql://admin:admin@localhost:5432/cctv"
 export REDIS_URL="redis://localhost:6379/0"
 export PYTHONPATH="$REPO_DIR/backend"
 
-pip install -q -r "$REPO_DIR/backend/requirements.txt" ultralytics aiohttp || pip install -q fastapi uvicorn pydantic sqlalchemy redis opencv-python-headless ultralytics pyyaml pydantic-settings python-multipart python-jose[cryptography] passlib loguru prometheus_client slowapi pyjwt bcrypt asyncpg psycopg2-binary aiohttp diskcache edge-tts psutil tenacity email-validator
+pip install -q -r "$REPO_DIR/backend/requirements.txt" ultralytics aiohttp pgvector aiosqlite || pip install -q fastapi uvicorn pydantic sqlalchemy redis opencv-python-headless ultralytics pyyaml pydantic-settings python-multipart python-jose[cryptography] passlib loguru prometheus_client slowapi pyjwt bcrypt asyncpg psycopg2-binary aiohttp diskcache edge-tts psutil tenacity email-validator pgvector aiosqlite
 
 # Setup test user and auto-create tables
 python seed_admin.py || true
