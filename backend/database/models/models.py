@@ -12,6 +12,8 @@ class Camera(Base):
     source_type = Column(String, nullable=False, server_default="rtsp")
     source = Column(String, nullable=True)
     active = Column(Boolean, default=True, server_default="true")
+    state = Column(String, nullable=True, server_default="STOPPED")
+    edge_id = Column(String, nullable=True, server_default="edge-01")
     created_at = Column(DateTime(timezone=True), default=func.now())
 
 

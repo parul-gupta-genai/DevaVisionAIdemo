@@ -365,11 +365,20 @@ app.add_middleware(
 )
 
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 import os
 
 snapshots_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "snapshots"))
 os.makedirs(snapshots_dir, exist_ok=True)
 app.mount("/snapshots", StaticFiles(directory=snapshots_dir), name="snapshots")
+
+uploads_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "uploads"))
+os.makedirs(uploads_dir, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
+
+videos_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "videos"))
+os.makedirs(videos_dir, exist_ok=True)
+app.mount("/videos", StaticFiles(directory=videos_dir), name="videos")
 
 frontend_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist"))
 if os.path.exists(frontend_dist):
