@@ -41,7 +41,11 @@ def resolve_secret_key(configured: str) -> str:
     is equally fail-closed for the actual vulnerability — the published key is
     never used — and the cost is only that tokens do not survive a key change.
     """
-    from loguru import logger
+    try:
+        from loguru import logger
+    except ImportError:
+        import logging
+        logger = logging.getLogger("DevaVisionAI")
 
     if configured and configured != INSECURE_SECRET_KEY:
         return configured
