@@ -13,17 +13,12 @@ WORKDIR="/kaggle/working"
 REPO_DIR="$WORKDIR/DevaVisionAI"
 
 # 1. System packages
-echo "[1/6] Installing system packages (PostgreSQL, Redis, FFmpeg, Node.js)..."
+echo "[1/6] Installing system packages (Redis, FFmpeg, Node.js)..."
 apt-get update -qq || true
-apt-get install -y -qq postgresql postgresql-contrib redis-server ffmpeg libgl1 libglib2.0-0 curl wget psmisc || apt-get install -y postgresql postgresql-contrib redis-server ffmpeg libgl1 curl wget
+apt-get install -y -qq redis-server ffmpeg libgl1 libglib2.0-0 curl wget psmisc || true
 
-# Start PostgreSQL & Redis
-service postgresql start || true
+# Start Redis
 service redis-server start || redis-server --daemonize yes || true
-
-# Initialize PostgreSQL Database & User
-su - postgres -c "psql -c \"DO \\\$do\\\$ BEGIN IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'admin') THEN CREATE USER admin WITH PASSWORD 'admin' SUPERUSER; END IF; END \\\$do\\\$;\"" || true
-su - postgres -c "psql -c \"SELECT 1 FROM pg_database WHERE datname = 'cctv'\" | grep -q 1 || psql -c \"CREATE DATABASE cctv OWNER admin;\"" || true
 
 # 2. Node.js Setup
 if ! command -v node &> /dev/null || [ "$(node -v | cut -d'.' -f1 | tr -d 'v')" -lt 18 ]; then
@@ -51,7 +46,6 @@ if [ -d "$REPO_DIR" ]; then
     cd "$REPO_DIR"
 else
     cd "$WORKDIR"
-    # Find directory if named differently
     FOUND_DIR=$(find $WORKDIR -maxdepth 1 -type d -name "*DevaVisionAI*" | head -n 1)
     if [ -n "$FOUND_DIR" ]; then
         cd "$FOUND_DIR"
@@ -73,7 +67,8 @@ echo "Frontend built successfully."
 echo "[5/6] Starting Unified FastAPI Backend (ANPR Engine)..."
 cd "$REPO_DIR/backend"
 
-export DATABASE_URL="postgresql://admin:admin@localhost:5432/cctv"
+# Use SQLite for 100% reliable zero-configuration embedded DB in Kaggle
+export DATABASE_URL="sqlite:///$REPO_DIR/backend/devavision.db"
 export REDIS_URL="redis://localhost:6379/0"
 export PYTHONPATH="$REPO_DIR/backend"
 
@@ -89,7 +84,7 @@ echo "Unified Server starting on port 8000..."
 
 # Wait for backend healthcheck
 BACKEND_OK=0
-for i in {1..20}; do
+for i in {1..25}; do
     sleep 1
     if curl -s http://127.0.0.1:8000/docs > /dev/null; then
         BACKEND_OK=1
@@ -100,23 +95,24 @@ done
 
 if [ $BACKEND_OK -eq 0 ]; then
     echo "⚠️ Backend log error details:"
-    tail -n 25 $WORKDIR/backend.log
+    tail -n 35 $WORKDIR/backend.log
 fi
 
 # 7. Cloudflare Tunnel for Free Public HTTPS Access
-echo "[6/6] Launching Cloudflare Tunnel (100% Free Public HTTPS URL)..."
-if [ ! -f "/usr/local/bin/cloudflared" ]; then
-    wget -q -O /usr/local/bin/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
-    chmod +x /usr/local/bin/cloudflared
+echo "[6/6] Launching Public Tunnel..."
+CLOUDFLARED_BIN="$WORKDIR/cloudflared"
+if [ ! -f "$CLOUDFLARED_BIN" ]; then
+    wget -q -O "$CLOUDFLARED_BIN" https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+    chmod +x "$CLOUDFLARED_BIN"
 fi
 
 pkill -f "cloudflared" || true
-nohup /usr/local/bin/cloudflared tunnel --url http://127.0.0.1:8000 > $WORKDIR/tunnel.log 2>&1 &
+nohup "$CLOUDFLARED_BIN" tunnel --url http://127.0.0.1:8000 > $WORKDIR/tunnel.log 2>&1 &
 
 echo "========================================================="
 echo "Waiting for Public Link..."
 PUBLIC_URL=""
-for i in {1..25}; do
+for i in {1..30}; do
     sleep 2
     if [ -f "$WORKDIR/tunnel.log" ]; then
         PUBLIC_URL=$(grep -oE "https://[a-zA-Z0-9-]+\.trycloudflare\.com" $WORKDIR/tunnel.log | tail -n 1)
