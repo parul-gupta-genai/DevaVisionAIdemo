@@ -322,6 +322,13 @@ async def lifespan(app: FastAPI):
     logger.info("Shutdown complete.")
 
 app = FastAPI(title="DevaVision AI Enterprise API", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -356,14 +363,6 @@ app.include_router(voice_router)
 app.include_router(tts_router)
 app.include_router(provider_router)
 app.include_router(customer_router)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], # Since we need wildcard for dev, allow_credentials must be False
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse

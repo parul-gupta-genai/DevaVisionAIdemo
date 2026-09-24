@@ -11,12 +11,34 @@ from app.auth.dependencies import get_current_user, require_permissions
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/login", response_model=Token)
-def login(
+async def login(
     request: Request,
-    login_data: LoginRequest,
     db: Session = Depends(get_db)
 ) -> Any:
     """Authenticate user and return JWT access and refresh tokens."""
+    email = None
+    password = None
+    
+    try:
+        body = await request.json()
+        if isinstance(body, dict):
+            email = body.get("email") or body.get("username")
+            password = body.get("password")
+    except Exception:
+        pass
+        
+    if not email or not password:
+        try:
+            form = await request.form()
+            email = form.get("username") or form.get("email")
+            password = form.get("password")
+        except Exception:
+            pass
+
+    if not email or not password:
+        raise HTTPException(status_code=400, detail="Email and password required")
+
+    login_data = LoginRequest(email=str(email), password=str(password))
     return authenticate_user(db, login_data)
 
 @router.post("/refresh", response_model=Token)
