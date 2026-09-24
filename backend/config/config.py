@@ -541,5 +541,54 @@ config.apply_persisted_state()
 config.SECRET_KEY = resolve_secret_key(config.SECRET_KEY)
 
 import redis
-# Global redis client for inter-process communication
-redis_client = redis.Redis.from_url(config.REDIS_URL, decode_responses=True)
+
+class SafeRedis:
+    def __init__(self, url):
+        try:
+            self._client = redis.Redis.from_url(url, decode_responses=True)
+        except Exception:
+            self._client = None
+
+    def get(self, key, *args, **kwargs):
+        if self._client:
+            try:
+                return self._client.get(key, *args, **kwargs)
+            except Exception:
+                pass
+        return None
+
+    def set(self, key, value, *args, **kwargs):
+        if self._client:
+            try:
+                return self._client.set(key, value, *args, **kwargs)
+            except Exception:
+                pass
+        return True
+
+    def delete(self, *keys):
+        if self._client:
+            try:
+                return self._client.delete(*keys)
+            except Exception:
+                pass
+        return 0
+
+    def publish(self, channel, message):
+        if self._client:
+            try:
+                return self._client.publish(channel, message)
+            except Exception:
+                pass
+        return 0
+
+    def __getattr__(self, name):
+        def method(*args, **kwargs):
+            if self._client:
+                try:
+                    return getattr(self._client, name)(*args, **kwargs)
+                except Exception:
+                    pass
+            return None
+        return method
+
+redis_client = SafeRedis(config.REDIS_URL)
