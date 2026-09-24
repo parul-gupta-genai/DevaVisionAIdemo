@@ -83,7 +83,7 @@ export function Sidebar() {
   })).filter(group => group.items.length > 0);
 
   const filteredBottomNavItems = bottomNavItems.filter(item => {
-    if (['Users', 'Settings'].includes(item.label) && !isAdmin) return false;
+    if (['Users'].includes(item.label) && !isAdmin) return false;
     return true;
   });
 
