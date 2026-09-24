@@ -1,5 +1,5 @@
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, BackgroundTasks
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse, Response
 from pydantic import BaseModel
 import shutil
 import os
@@ -402,4 +402,103 @@ def get_cameras_status():
         return status
     finally:
         db.close()
+
+
+def _generate_mjpeg_frames(camera_id: str):
+    import cv2
+
+    db = SessionLocal()
+    try:
+        repo = CameraRepository(db)
+        cam = repo.get_by_id(camera_id)
+        if not cam:
+            return
+        src = getattr(cam, 'source', None) or getattr(cam, 'rtsp_url', None) or "0"
+    finally:
+        db.close()
+
+    if str(src).isdigit():
+        src = int(src)
+    elif isinstance(src, str):
+        src = src.strip("\"'")
+        if src.startswith("file://"):
+            src = src[7:]
+        if not src.startswith("http://") and not src.startswith("https://") and not src.startswith("rtsp://"):
+            if not os.path.exists(src):
+                base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+                candidates = [
+                    os.path.join(base_dir, "sample_videos", os.path.basename(src)),
+                    os.path.join(base_dir, "sample_videos", "bucket11.mp4"),
+                    os.path.join(base_dir, "backend", "uploads", os.path.basename(src)),
+                ]
+                for cand in candidates:
+                    if os.path.exists(cand):
+                        src = cand
+                        break
+
+    cap = cv2.VideoCapture(src)
+    try:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                ret, frame = cap.read()
+                if not ret:
+                    time.sleep(0.1)
+                    continue
+
+            _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+            time.sleep(0.033)
+    finally:
+        cap.release()
+
+@router.get("/{cam_id}/stream")
+def get_camera_stream(cam_id: str):
+    return StreamingResponse(
+        _generate_mjpeg_frames(cam_id),
+        media_type="multipart/x-mixed-replace; boundary=frame"
+    )
+
+@router.get("/{cam_id}/snapshot")
+def get_camera_snapshot(cam_id: str):
+    import cv2
+
+    db = SessionLocal()
+    try:
+        repo = CameraRepository(db)
+        cam = repo.get_by_id(cam_id)
+        if not cam:
+            return Response(status_code=404)
+        src = getattr(cam, 'source', None) or getattr(cam, 'rtsp_url', None) or "0"
+    finally:
+        db.close()
+
+    if str(src).isdigit():
+        src = int(src)
+    elif isinstance(src, str):
+        src = src.strip("\"'")
+        if src.startswith("file://"):
+            src = src[7:]
+        if not src.startswith("http://") and not src.startswith("https://") and not src.startswith("rtsp://"):
+            if not os.path.exists(src):
+                base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+                candidates = [
+                    os.path.join(base_dir, "sample_videos", os.path.basename(src)),
+                    os.path.join(base_dir, "sample_videos", "bucket11.mp4"),
+                ]
+                for cand in candidates:
+                    if os.path.exists(cand):
+                        src = cand
+                        break
+
+    cap = cv2.VideoCapture(src)
+    ret, frame = cap.read()
+    cap.release()
+    if ret:
+        _, buffer = cv2.imencode('.jpg', frame)
+        return Response(content=buffer.tobytes(), media_type="image/jpeg")
+    return Response(status_code=404)
+
 

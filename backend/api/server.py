@@ -380,8 +380,50 @@ videos_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "vide
 os.makedirs(videos_dir, exist_ok=True)
 app.mount("/videos", StaticFiles(directory=videos_dir), name="videos")
 
+# WebRTC / WHEP Stream Handlers
+@app.options("/webrtc-stream/{path:path}")
+async def whep_options(path: str):
+    return Response(
+        status_code=204,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PATCH, DELETE",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Expose-Headers": "Location",
+            "Accept-Post": "application/sdp"
+        }
+    )
+
+@app.post("/webrtc-stream/{path:path}")
+@app.patch("/webrtc-stream/{path:path}")
+@app.delete("/webrtc-stream/{path:path}")
+async def whep_proxy(path: str, request: Request):
+    import urllib.request
+    body = await request.body()
+    mediamtx_url = f"http://127.0.0.1:8889/{path}"
+    try:
+        req = urllib.request.Request(
+            mediamtx_url,
+            data=body if request.method in ["POST", "PATCH"] else None,
+            headers={k: v for k, v in request.headers.items() if k.lower() not in ["host", "content-length"]},
+            method=request.method
+        )
+        with urllib.request.urlopen(req, timeout=2.0) as resp:
+            resp_body = resp.read()
+            resp_headers = dict(resp.headers)
+            resp_headers["Access-Control-Allow-Origin"] = "*"
+            return Response(
+                content=resp_body,
+                status_code=resp.status,
+                headers=resp_headers,
+                media_type=resp.headers.get("content-type", "application/sdp")
+            )
+    except Exception:
+        return Response(status_code=503, content=b"MediaMTX stream unavailable")
+
 frontend_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist"))
 if os.path.exists(frontend_dist):
     app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
 else:
     print(f"Warning: Frontend dist directory not found at {frontend_dist}. UI will not be served natively.")
+
