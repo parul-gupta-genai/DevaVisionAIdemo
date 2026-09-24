@@ -50,7 +50,7 @@ class FacePerson(Base):
     # The embedding matched against at runtime: the centroid of this person's
     # accepted enrolment images, so several angles collapse into one vector and
     # the hot path stays a single indexed nearest-neighbour lookup.
-    face_embedding = Column(Vector(EMBEDDING_DIM), nullable=True)
+    face_embedding = Column(Vector(EMBEDDING_DIM).with_variant(JSON(), "sqlite"), nullable=True)
     enrolment_count = Column(Integer, nullable=False, default=0)
     photo = Column(String, nullable=True)
 
@@ -83,7 +83,7 @@ class FaceEnrolment(Base):
         String, ForeignKey("face_persons.person_id", ondelete="CASCADE"),
         index=True, nullable=False,
     )
-    face_embedding = Column(Vector(EMBEDDING_DIM), nullable=False)
+    face_embedding = Column(Vector(EMBEDDING_DIM).with_variant(JSON(), "sqlite"), nullable=False)
     snapshot_path = Column(String, nullable=True)
 
     # Quality evidence for the accept/reject decision, kept for audit.

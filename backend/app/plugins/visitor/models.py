@@ -19,7 +19,7 @@ class Visitor(Base):
     company = Column(String, nullable=True)
     id_document_number = Column(String, nullable=True)
     vehicle_number = Column(String, nullable=True)
-    face_embedding = Column(Vector(512), nullable=True) # 512-dimensional pgvector array
+    face_embedding = Column(Vector(512).with_variant(JSON(), "sqlite"), nullable=True) # 512-dimensional pgvector array
     first_seen = Column(DateTime, nullable=True)
     last_seen = Column(DateTime, nullable=True)
     total_visits = Column(Integer, default=0)
